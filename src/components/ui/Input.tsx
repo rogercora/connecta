@@ -9,11 +9,15 @@ export interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElem
   hint?: string;
   iconLeft?: React.ReactNode;
   iconRight?: React.ReactNode;
+  leftIcon?: React.ReactNode;
+  rightIcon?: React.ReactNode;
 }
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, label, error, hint, iconLeft, iconRight, id, ...props }, ref) => {
+  ({ className, label, error, hint, iconLeft, iconRight, leftIcon, rightIcon, id, ...props }, ref) => {
     const inputId = id || label?.toLowerCase().replace(/\s+/g, '-');
+    const finalLeftIcon = leftIcon || iconLeft;
+    const finalRightIcon = rightIcon || iconRight;
 
     return (
       <div className="w-full">
@@ -26,9 +30,9 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
           </label>
         )}
         <div className="relative">
-          {iconLeft && (
+          {finalLeftIcon && (
             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-gray-400">
-              {iconLeft}
+              {finalLeftIcon}
             </div>
           )}
           <input
@@ -42,8 +46,8 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
               error
                 ? 'border-red-300 focus:border-red-500 focus:ring-red-500/20'
                 : 'border-gray-300 focus:border-brand-500 focus:ring-brand-500/20',
-              iconLeft && 'pl-10',
-              iconRight && 'pr-10',
+              finalLeftIcon && 'pl-10',
+              finalRightIcon && 'pr-10',
               'disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed',
               className
             )}
@@ -51,9 +55,9 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             aria-describedby={error ? `${inputId}-error` : hint ? `${inputId}-hint` : undefined}
             {...props}
           />
-          {iconRight && (
+          {finalRightIcon && (
             <div className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-gray-400">
-              {iconRight}
+              {finalRightIcon}
             </div>
           )}
         </div>
