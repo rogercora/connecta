@@ -1,6 +1,6 @@
 {
-  "name": "Cidadão Connect - Cidadania Geolocalizada",
-  "short_name": "Connect",
+  "name": "Conecta - Cidadania Geolocalizada",
+  "short_name": "Conecta",
   "description": "Rede social de cidadania geolocalizada e inteligência cívica por CEP",
   "start_url": "/feed",
   "display": "standalone",
@@ -20,4 +20,3 @@
     }
   ]
 }
-

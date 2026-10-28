@@ -29,8 +29,8 @@ export const LoginForm: React.FC = () => {
     <div className="w-full max-w-sm mx-auto space-y-6">
       {/* Logo */}
       <div className="text-center space-y-1">
-        <h1 className="text-2xl font-black text-gray-900 tracking-tight">
-          Cidadão <span className="text-emerald-600">Connect</span>
+        <h1 className="text-3xl font-black text-gray-900 tracking-tighter">
+          Conecta
         </h1>
         <p className="text-xs text-gray-500">
           Sua voz, seu bairro, sua cidade em tempo real.

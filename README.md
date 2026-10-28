@@ -1,4 +1,4 @@
-# 🏛️ Cidadão Connect - Rede Social & Cidadania Geolocalizada
+# 🏛️ Conecta - Rede Social & Cidadania Geolocalizada
 
 Plataforma WebApp (PWA / Mobile-First) e híbrida (Capacitor) para acompanhamento cívico hiperlocal, tradução de Diários Oficiais com IA, votação de projetos de lei comunitários e zeladoria urbana com protocolo automático.
 
@@ -6,7 +6,7 @@ Plataforma WebApp (PWA / Mobile-First) e híbrida (Capacitor) para acompanhament
 
 ## 📱 Estrutura e Identidade Visual (Mockup)
 
-- **Header:** "Cidadão Connect" em tipografia marcante, com busca e mensagens integradas.
+- **Header:** "Conecta" em tipografia marcante, com busca e mensagens integradas.
 - **Abas Territoriais:** `Meu Bairro` (Hiperlocal por CEP) | `Minha Cidade` | `Brasil Federal`.
 - **Card Alerta de IA:** 
   - Tag visual `🤖 RESUMO INTELIGENTE`

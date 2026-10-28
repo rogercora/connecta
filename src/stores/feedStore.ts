@@ -42,7 +42,7 @@ export const INITIAL_POSTS: PostComunidade[] = [
       cpf_hash: null,
       created_at: new Date().toISOString(),
     },
-    foto_url: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&w=800&q=80',
+    foto_url: 'https://images.unsplash.com/photo-1578885136359-16c8bd4d3a8e?auto=format&fit=crop&w=800&q=80',
     descricao: 'Gente, esse buraco na Rua Agostinho Gomes está enorme! Já protocolado na Prefeitura (nº 12345). #ZeladoriaUrbana #ipiranga',
     cep: '04266-000',
     bairro: 'Ipiranga',

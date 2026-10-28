@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Cidadão Connect - Cidadania Geolocalizada',
+  title: 'Conecta - Cidadania Geolocalizada',
   description: 'Rede social de cidadania geolocalizada e inteligência cívica por CEP',
   manifest: '/manifest.json',
 };
@@ -28,4 +28,3 @@ export default function RootLayout({
     </html>
   );
 }
-
