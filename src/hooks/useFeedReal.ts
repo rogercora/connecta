@@ -15,19 +15,21 @@ export function usePautas(feedLevel: FeedLevel) {
         .eq('status', 'ativa')
         .order('created_at', { ascending: false });
 
-      // Filtro por nível do feed
       if (feedLevel === 'bairro') {
-        // TODO: pegar CEP do usuário logado via auth
-        // query = query.eq('cep_alvo', userCep);
+        query = query.eq('bairro_alvo', 'Ipiranga');
       } else if (feedLevel === 'cidade') {
-        // query = query.eq('cidade_alvo', userCidade);
+        query = query.eq('cidade_alvo', 'São Paulo');
       }
-      // federal: sem filtro adicional
 
       const { data, error } = await query;
-      if (error) throw error;
+      if (error) {
+        console.error('Erro ao buscar pautas no Supabase:', error);
+        throw error;
+      }
       return (data ?? []) as PautaIA[];
     },
+    retry: 1,
+    staleTime: 1000 * 60,
   });
 }
 
@@ -44,14 +46,17 @@ export function usePosts(feedLevel: FeedLevel) {
         .order('created_at', { ascending: false });
 
       if (feedLevel === 'bairro') {
-        // TODO: filtrar por CEP do usuário
-      } else if (feedLevel === 'cidade') {
-        // query = query.eq('cidade', userCidade);
+        query = query.eq('bairro', 'Ipiranga');
       }
 
       const { data, error } = await query;
-      if (error) throw error;
+      if (error) {
+        console.error('Erro ao buscar posts no Supabase:', error);
+        throw error;
+      }
       return (data ?? []) as (PostComunidade & { user: any })[];
     },
+    retry: 1,
+    staleTime: 1000 * 60,
   });
 }
