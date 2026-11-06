@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import { Providers } from './providers';
 
 export const metadata: Metadata = {
   title: 'Conecta - Cidadania Geolocalizada',
@@ -23,7 +24,9 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body className="bg-white font-sans antialiased text-gray-900 selection:bg-emerald-100 selection:text-emerald-900">
-        {children}
+        <Providers>
+          {children}
+        </Providers>
       </body>
     </html>
   );

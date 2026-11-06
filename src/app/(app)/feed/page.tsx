@@ -3,10 +3,10 @@
 import React from 'react';
 import { FeedTabs } from '@/components/feed/FeedTabs';
 import { FeedList } from '@/components/feed/FeedList';
-import { useFeed } from '@/hooks/useFeed';
+import { useFeedStore } from '@/stores/feedStore';
 
 export default function FeedPage() {
-  const { activeTab, setActiveTab } = useFeed();
+  const { activeTab, setActiveTab } = useFeedStore();
 
   return (
     <div className="w-full">
@@ -15,4 +15,3 @@ export default function FeedPage() {
     </div>
   );
 }
-

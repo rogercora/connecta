@@ -7,7 +7,7 @@ import { PostComunidade } from '@/types/database';
 import { useFeedStore } from '@/stores/feedStore';
 
 interface PostComunidadeCardProps {
-  post: PostComunidade;
+  post: PostComunidade & { user?: any };
 }
 
 export const PostComunidadeCard: React.FC<PostComunidadeCardProps> = ({ post }) => {
@@ -29,6 +29,13 @@ export const PostComunidadeCard: React.FC<PostComunidadeCardProps> = ({ post }) 
       ? post.foto_url
       : 'https://images.unsplash.com/photo-1578885136359-16c8bd4d3a8e?auto=format&fit=crop&w=800&q=80';
 
+  // Dados do usuário (vem do join no hook)
+  const user = post.user;
+  const nomeExibicao = user?.nome_completo || 'Usuário';
+  const bairroExibicao = user?.bairro || post.bairro;
+  const nivelVerificacao = user?.nivel_verificacao ?? 0;
+  const genero = user?.genero || 'neutro'; // TODO: adicionar coluna genero no schema
+
   return (
     <article className="bg-white max-w-md mx-auto pb-4 border-b border-gray-100">
       {/* Header do Autor */}
@@ -37,10 +44,10 @@ export const PostComunidadeCard: React.FC<PostComunidadeCardProps> = ({ post }) 
           <div className="relative w-10 h-10 rounded-full overflow-hidden bg-gray-100 border border-gray-200">
             <Image
               src={
-                post.user?.avatar_url ||
+                user?.avatar_url ||
                 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=250&q=80'
               }
-              alt={post.user?.nome_completo || 'Maria Silva'}
+              alt={nomeExibicao}
               fill
               className="object-cover"
             />
@@ -49,17 +56,27 @@ export const PostComunidadeCard: React.FC<PostComunidadeCardProps> = ({ post }) 
           <div>
             <div className="flex items-center space-x-1">
               <span className="text-xs font-bold text-gray-900 leading-tight">
-                {post.user?.nome_completo || 'Maria Silva'}
+                {nomeExibicao}
               </span>
               <span className="text-xs font-semibold text-gray-900 leading-tight">
-                (Moradora do {post.bairro})
+                ({genero === 'feminino' ? 'Moradora' : genero === 'masculino' ? 'Morador' : 'Morador(a)'} do {bairroExibicao})
               </span>
             </div>
             <div className="flex items-center space-x-1 mt-0.5">
-              <span className="w-3.5 h-3.5 rounded-full bg-[#1ea751] text-white flex items-center justify-center text-[9px] font-black">
-                <Check className="w-2.5 h-2.5 stroke-[3.5]" />
-              </span>
-              <span className="text-[10px] text-[#0d9488] font-bold">Verificado</span>
+              {nivelVerificacao >= 2 && (
+                <>
+                  <span className="w-3.5 h-3.5 rounded-full bg-[#1ea751] text-white flex items-center justify-center text-[9px] font-black">
+                    <Check className="w-2.5 h-2.5 stroke-[3.5]" />
+                  </span>
+                  <span className="text-[10px] text-[#0d9488] font-bold">Verificado</span>
+                </>
+              )}
+              {nivelVerificacao === 1 && (
+                <span className="text-[10px] text-gray-500 font-medium">Cadastrado</span>
+              )}
+              {nivelVerificacao === 0 && (
+                <span className="text-[10px] text-gray-400 font-medium">Visitante</span>
+              )}
             </div>
           </div>
         </div>
@@ -73,7 +90,7 @@ export const PostComunidadeCard: React.FC<PostComunidadeCardProps> = ({ post }) 
       <div className="relative w-full aspect-[4/3] bg-neutral-100 overflow-hidden">
         <Image
           src={fotoUrlRealista}
-          alt="Buraco no asfalto reportado"
+          alt="Problema de zeladoria reportado"
           fill
           className="object-cover"
           sizes="(max-width: 480px) 100vw, 448px"
@@ -104,19 +121,17 @@ export const PostComunidadeCard: React.FC<PostComunidadeCardProps> = ({ post }) 
         </button>
       </div>
 
-      {/* Descrição e Protocolo */}
+      {/* Descrição e Protocolo - USA DADOS REAIS */}
       <div className="px-3.5 py-1 space-y-1.5 text-xs text-gray-900">
         <p className="leading-snug">
-          <span>Gente, esse buraco na Rua Agostinho Gomes está enorme! </span>
-          <span className="font-semibold text-gray-900">
-            Já protocolado na Prefeitura (nº {post.numero_protocolo}).
-          </span>
+          {post.descricao}
         </p>
 
-        {/* Hashtags */}
+        {/* Hashtags dinâmicas baseadas na categoria/bairro */}
         <p className="text-[11px] text-gray-800 font-medium space-x-1.5">
           <span className="hover:underline cursor-pointer">#ZeladoriaUrbana</span>
-          <span className="hover:underline cursor-pointer">#ipiranga</span>
+          <span className="hover:underline cursor-pointer">#{bairroExibicao.toLowerCase().replace(/\s+/g, '')}</span>
+          <span className="hover:underline cursor-pointer">#{post.categoria}</span>
         </p>
 
         {/* Contadores */}
@@ -127,7 +142,7 @@ export const PostComunidadeCard: React.FC<PostComunidadeCardProps> = ({ post }) 
           </div>
           <div className="flex items-center space-x-1">
             <MessageCircle className="w-3.5 h-3.5 stroke-[2]" />
-            <span>8</span>
+            <span>0</span>
           </div>
         </div>
       </div>
