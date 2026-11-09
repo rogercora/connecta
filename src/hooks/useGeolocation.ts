@@ -8,6 +8,7 @@ export interface EnderecoViaCEP {
   bairro: string;
   localidade: string;
   uf: string;
+  isSJC?: boolean;
 }
 
 export function useGeolocation() {
@@ -20,14 +21,41 @@ export function useGeolocation() {
 
     setLoading(true);
     try {
-      // Mock inteligente para resposta instantânea ou fallback para viacep
-      if (cleanCEP === '04266000') {
+      // Mock instantâneo para CEPs frequentes de teste
+      if (cleanCEP === '12246021') {
         const mockResult: EnderecoViaCEP = {
-          cep: '04266-000',
-          logradouro: 'Rua Silva Bueno',
-          bairro: 'Ipiranga',
-          localidade: 'São Paulo',
+          cep: '12246-021',
+          logradouro: 'Avenida Cassiano Ricardo',
+          bairro: 'Jardim Aquárius',
+          localidade: 'São José dos Campos',
           uf: 'SP',
+          isSJC: true,
+        };
+        setEndereco(mockResult);
+        return mockResult;
+      }
+
+      if (cleanCEP === '12230000') {
+        const mockResult: EnderecoViaCEP = {
+          cep: '12230-000',
+          logradouro: 'Avenida Andrômeda',
+          bairro: 'Jardim Satélite',
+          localidade: 'São José dos Campos',
+          uf: 'SP',
+          isSJC: true,
+        };
+        setEndereco(mockResult);
+        return mockResult;
+      }
+
+      if (cleanCEP === '12308000') {
+        const mockResult: EnderecoViaCEP = {
+          cep: '12308-000',
+          logradouro: 'Praça dos Três Poderes',
+          bairro: 'Centro',
+          localidade: 'Jacareí',
+          uf: 'SP',
+          isSJC: false,
         };
         setEndereco(mockResult);
         return mockResult;
@@ -36,11 +64,19 @@ export function useGeolocation() {
       const res = await fetch(`https://viacep.com.br/ws/${cleanCEP}/json/`);
       const data = await res.json();
       if (!data.erro) {
-        setEndereco(data);
-        return data as EnderecoViaCEP;
+        const isSJC =
+          data.localidade?.toLowerCase().includes('josé dos campos') ||
+          (cleanCEP >= '12200000' && cleanCEP <= '12249999');
+
+        const resultado: EnderecoViaCEP = {
+          ...data,
+          isSJC,
+        };
+        setEndereco(resultado);
+        return resultado;
       }
-    } catch {
-      // Fallback
+    } catch (e) {
+      console.error('Erro na consulta do CEP:', e);
     } finally {
       setLoading(false);
     }
@@ -49,4 +85,3 @@ export function useGeolocation() {
 
   return { buscarCEP, endereco, loading };
 }
-

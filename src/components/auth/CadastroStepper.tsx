@@ -3,14 +3,16 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { User, Mail, Lock, Phone, MapPin, CheckCircle, ArrowRight, ArrowLeft } from 'lucide-react';
+import { User, Mail, Lock, Phone, MapPin, CheckCircle, ArrowRight, ArrowLeft, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { formatCEP, formatPhone } from '@/lib/utils/formatters';
+import { useAuthStore } from '@/stores/authStore';
 
 export const CadastroStepper: React.FC = () => {
   const router = useRouter();
+  const setLocalizacao = useAuthStore((s) => s.setLocalizacao);
   const [step, setStep] = useState<1 | 2>(1);
 
   // Step 1
@@ -45,11 +47,20 @@ export const CadastroStepper: React.FC = () => {
   const handleFinalSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoadingSubmit(true);
-    // Simula criação de usuário e redireciona para o feed
+
+    if (endereco) {
+      setLocalizacao({
+        cidade: endereco.localidade || 'São José dos Campos',
+        estado: endereco.uf || 'SP',
+        bairro: endereco.bairro || 'Jardim Aquárius',
+        cep: endereco.cep || cep,
+      });
+    }
+
     setTimeout(() => {
       setLoadingSubmit(false);
       router.push('/feed');
-    }, 600);
+    }, 500);
   };
 
   return (
@@ -74,7 +85,7 @@ export const CadastroStepper: React.FC = () => {
         <form onSubmit={handleStep1Next} className="space-y-4">
           <Input
             label="Nome Completo"
-            placeholder="Ex: Maria Silva"
+            placeholder="Ex: Carlos Eduardo"
             value={nome}
             onChange={(e) => setNome(e.target.value)}
             leftIcon={<User className="w-4 h-4 text-gray-400" />}
@@ -84,7 +95,7 @@ export const CadastroStepper: React.FC = () => {
           <Input
             label="Seu melhor E-mail"
             type="email"
-            placeholder="maria@exemplo.com"
+            placeholder="carlos@exemplo.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             leftIcon={<Mail className="w-4 h-4 text-gray-400" />}
@@ -120,7 +131,7 @@ export const CadastroStepper: React.FC = () => {
         <form onSubmit={handleFinalSubmit} className="space-y-4">
           <Input
             label="Telefone Celular (para validação OTP)"
-            placeholder="(11) 98765-4321"
+            placeholder="(12) 98765-4321"
             value={phone}
             onChange={(e) => setPhone(formatPhone(e.target.value))}
             leftIcon={<Phone className="w-4 h-4 text-gray-400" />}
@@ -130,7 +141,7 @@ export const CadastroStepper: React.FC = () => {
           <div>
             <Input
               label="CEP Residencial (Vínculo de Bairro)"
-              placeholder="00000-000"
+              placeholder="12246-021"
               value={cep}
               onChange={handleCepChange}
               leftIcon={<MapPin className="w-4 h-4 text-gray-400" />}
@@ -139,16 +150,35 @@ export const CadastroStepper: React.FC = () => {
             {loadingCep && (
               <p className="text-[10px] text-gray-400 mt-1">Buscando endereço pelo CEP...</p>
             )}
+
             {endereco && (
-              <div className="mt-2 p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start space-x-2 text-xs text-emerald-800">
-                <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-bold">Bairro Detectado: {endereco.bairro}</p>
-                  <p className="text-[11px] text-emerald-700">
-                    {endereco.localidade} - {endereco.uf}
-                  </p>
-                </div>
-              </div>
+              <>
+                {endereco.isSJC ? (
+                  <div className="mt-2.5 p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-start space-x-2 text-xs text-emerald-900 shadow-sm">
+                    <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <div className="space-y-0.5">
+                      <p className="font-extrabold text-emerald-800">
+                        🎉 Piloto Oficial Ativo em SJC!
+                      </p>
+                      <p className="text-[11px] text-emerald-700">
+                        Bairro: <strong>{endereco.bairro}</strong> ({endereco.localidade} - {endereco.uf})
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-2.5 p-3.5 bg-amber-50 border border-amber-200 rounded-2xl flex items-start space-x-2 text-xs text-amber-900 shadow-sm">
+                    <Clock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div className="space-y-0.5">
+                      <p className="font-extrabold text-amber-800">
+                        🚀 Cidade em Desbloqueio Comunitário!
+                      </p>
+                      <p className="text-[11px] text-amber-700">
+                        {endereco.localidade} - {endereco.uf}. Ao concluir, você verá a meta da sua cidade e poderá convidar vizinhos para liberá-la.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
@@ -188,4 +218,3 @@ export const CadastroStepper: React.FC = () => {
     </div>
   );
 };
-

@@ -6,10 +6,16 @@ import { useRouter } from 'next/navigation';
 import { ShieldCheck, MapPin, Phone, Mail, Award, CheckCircle2, AlertCircle, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/hooks/useAuth';
+import { useAuthStore } from '@/stores/authStore';
 
 export default function PerfilPage() {
   const router = useRouter();
   const { user, isNivel2, setNivelVerificacao, logout } = useAuth();
+  const setLocalizacao = useAuthStore((s) => s.setLocalizacao);
+
+  const handleMudarCidade = (cidade: string, estado: string, bairro: string, cep: string) => {
+    setLocalizacao({ cidade, estado, bairro, cep });
+  };
 
   const handleToggleNivel = () => {
     // Permite alternar para demonstrar e testar facilmente o comportamento do sistema
@@ -44,7 +50,7 @@ export default function PerfilPage() {
           {user?.nome_completo || 'Maria Silva'}
         </h3>
         <p className="text-xs text-gray-500">
-          Moradora do {user?.bairro || 'Ipiranga'} • {user?.cidade || 'São Paulo'} - {user?.estado || 'SP'}
+          Moradora do {user?.bairro || 'Jardim Aquárius'} • {user?.cidade || 'São José dos Campos'} - {user?.estado || 'SP'}
         </p>
 
         {/* Badge de Nível */}
@@ -96,6 +102,47 @@ export default function PerfilPage() {
         >
           Alternar Nível ({isNivel2 ? 'Mudar para Nível 1' : 'Verificar como Nível 2'})
         </Button>
+      </div>
+
+      {/* Simulador de Localização (Piloto SJC vs. Lista de Espera) */}
+      <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm space-y-3">
+        <div className="flex items-center justify-between">
+          <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center space-x-1">
+            <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Simulador de Cidade</span>
+          </h4>
+          <span className="text-[10px] text-gray-400 font-semibold">Teste do Piloto</span>
+        </div>
+
+        <p className="text-[11px] text-gray-500">
+          Alterne a cidade do seu perfil para testar o feed completo em SJC ou o bloqueio com meta comunitária em outras cidades:
+        </p>
+
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={() => handleMudarCidade('São José dos Campos', 'SP', 'Jardim Aquárius', '12246-021')}
+            className={`p-2.5 rounded-xl border text-left text-xs font-bold transition-all ${
+              user?.cidade === 'São José dos Campos'
+                ? 'bg-emerald-50 border-emerald-500 text-emerald-900 ring-1 ring-emerald-500'
+                : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            <span className="block text-[10px] text-emerald-600 font-extrabold uppercase">🟢 Piloto Ativo</span>
+            São José dos Campos
+          </button>
+
+          <button
+            onClick={() => handleMudarCidade('Jacareí', 'SP', 'Centro', '12308-000')}
+            className={`p-2.5 rounded-xl border text-left text-xs font-bold transition-all ${
+              user?.cidade === 'Jacareí'
+                ? 'bg-amber-50 border-amber-500 text-amber-900 ring-1 ring-amber-500'
+                : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            <span className="block text-[10px] text-amber-600 font-extrabold uppercase">🚀 Em Espera</span>
+            Jacareí
+          </button>
+        </div>
       </div>
 
       {/* Estatísticas */}

@@ -11,7 +11,7 @@ export default function FeedPage() {
   return (
     <div className="w-full">
       <FeedTabs activeTab={activeTab} onTabChange={setActiveTab} />
-      <FeedList feedLevel={activeTab} />
+      <FeedList feedLevel={activeTab} onSwitchTab={setActiveTab} />
     </div>
   );
 }
