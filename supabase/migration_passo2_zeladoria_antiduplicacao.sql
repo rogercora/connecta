@@ -3,20 +3,11 @@
 -- Executar no Supabase SQL Editor
 -- ============================================================
 
--- 1. CORREÇÃO DE SEGURANÇA (Supabase Security Advisor: rls_disabled_in_public)
--- Habilita RLS na tabela interna do PostGIS spatial_ref_sys e restringe a SELECT público
-ALTER TABLE IF EXISTS public.spatial_ref_sys ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "spatial_ref_sys_read_only" ON public.spatial_ref_sys;
-CREATE POLICY "spatial_ref_sys_read_only"
-  ON public.spatial_ref_sys
-  FOR SELECT
-  USING (true);
-
--- 2. CAMPO DE MORADORES AFETADOS EM posts_comunidade
+-- 1. CAMPO DE MORADORES AFETADOS EM posts_comunidade
 ALTER TABLE public.posts_comunidade
   ADD COLUMN IF NOT EXISTS moradores_afetados INT DEFAULT 1;
 
--- 3. TABELA DE APOIOS/AFETADOS ("Também me afeta / +1")
+-- 2. TABELA DE APOIOS/AFETADOS ("Também me afeta / +1")
 CREATE TABLE IF NOT EXISTS public.post_apoios (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   post_id UUID NOT NULL REFERENCES public.posts_comunidade(id) ON DELETE CASCADE,
@@ -28,19 +19,22 @@ CREATE TABLE IF NOT EXISTS public.post_apoios (
 -- RLS para post_apoios
 ALTER TABLE public.post_apoios ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "post_apoios: leitura pública" ON public.post_apoios;
 CREATE POLICY "post_apoios: leitura pública"
   ON public.post_apoios FOR SELECT
   USING (true);
 
+DROP POLICY IF EXISTS "post_apoios: insert permitido" ON public.post_apoios;
 CREATE POLICY "post_apoios: insert permitido"
   ON public.post_apoios FOR INSERT
   WITH CHECK (true);
 
+DROP POLICY IF EXISTS "post_apoios: delete permitido" ON public.post_apoios;
 CREATE POLICY "post_apoios: delete permitido"
   ON public.post_apoios FOR DELETE
   USING (true);
 
--- 4. FUNÇÃO RPC: toggle_apoiar_post
+-- 3. FUNÇÃO RPC: toggle_apoiar_post
 -- Permite ao cidadão dar "+1 / Também me afeta" ou remover se já clicou
 CREATE OR REPLACE FUNCTION public.toggle_apoiar_post(
   p_post_id UUID,
@@ -86,7 +80,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 5. FUNÇÃO RPC: criar_post_zeladoria
+-- 4. FUNÇÃO RPC: criar_post_zeladoria
 -- Cria um novo chamado oficial de zeladoria com número de protocolo
 CREATE OR REPLACE FUNCTION public.criar_post_zeladoria(
   p_user_id UUID,
@@ -131,7 +125,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 6. STORAGE BUCKET: zeladoria-fotos
+-- 5. STORAGE BUCKET: zeladoria-fotos
 -- Permite upload e visualização pública de fotos de zeladoria
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('zeladoria-fotos', 'zeladoria-fotos', true)
@@ -147,4 +141,3 @@ DROP POLICY IF EXISTS "zeladoria-fotos: upload público" ON storage.objects;
 CREATE POLICY "zeladoria-fotos: upload público"
   ON storage.objects FOR INSERT
   WITH CHECK (bucket_id = 'zeladoria-fotos');
-
