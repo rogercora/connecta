@@ -70,6 +70,8 @@ export interface PostComunidade {
   categoria: CategoriaComunidade;
   numero_protocolo: string;
   curtidas: number;
+  moradores_afetados?: number;
+  user_ja_apoiou?: boolean;
   created_at: string;
 }
 

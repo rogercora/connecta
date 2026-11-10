@@ -49,6 +49,8 @@ export const INITIAL_POSTS: PostComunidade[] = [
     categoria: 'buraco',
     numero_protocolo: '12345',
     curtidas: 31,
+    moradores_afetados: 18,
+    user_ja_apoiou: false,
     created_at: new Date().toISOString(),
   },
 ];
@@ -60,6 +62,7 @@ interface FeedStore {
   setActiveTab: (tab: FeedLevel) => void;
   votarPauta: (pautaId: string, opcao: 'concordar' | 'discordar') => void;
   curtirPost: (postId: string) => void;
+  toggleApoiarPost: (postId: string) => void;
   adicionarPost: (post: PostComunidade) => void;
 }
 
@@ -85,6 +88,20 @@ export const useFeedStore = create<FeedStore>((set) => ({
       posts: state.posts.map((post) =>
         post.id === postId ? { ...post, curtidas: post.curtidas + 1 } : post
       ),
+    }));
+  },
+  toggleApoiarPost: (postId) => {
+    set((state) => ({
+      posts: state.posts.map((post) => {
+        if (post.id !== postId) return post;
+        const jaApoiou = !!post.user_ja_apoiou;
+        const total = (post.moradores_afetados || 1) + (jaApoiou ? -1 : 1);
+        return {
+          ...post,
+          user_ja_apoiou: !jaApoiou,
+          moradores_afetados: Math.max(1, total),
+        };
+      }),
     }));
   },
   adicionarPost: (post) => {
