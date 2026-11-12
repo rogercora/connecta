@@ -3,7 +3,7 @@
 import React from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { ShieldCheck, MapPin, Phone, Mail, Award, CheckCircle2, AlertCircle, LogOut } from 'lucide-react';
+import { ShieldCheck, MapPin, Phone, Mail, Award, CheckCircle2, AlertCircle, LogOut, Sparkles, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthStore } from '@/stores/authStore';
@@ -159,6 +159,32 @@ export default function PerfilPage() {
           <p className="text-base font-black text-blue-600">1</p>
           <p className="text-[10px] text-gray-500 font-medium">Petição Ativa</p>
         </div>
+      </div>
+
+      {/* Acesso ao Painel de Moderação Cívica (Admin) */}
+      <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-4 shadow-sm space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Sparkles className="w-4 h-4 text-emerald-600" />
+            <h4 className="text-xs font-black text-gray-900">
+              Modo Administrador & IA
+            </h4>
+          </div>
+          <span className="text-[10px] bg-emerald-600 text-white font-bold px-2 py-0.5 rounded-full">
+            Gestor SJC
+          </span>
+        </div>
+        <p className="text-[11px] text-gray-600 leading-snug">
+          Gere pautas com IA a partir do Diário Oficial de SJC, revise rascunhos e aprove publicações para o feed.
+        </p>
+        <Button
+          variant="primary"
+          onClick={() => router.push('/admin')}
+          className="w-full rounded-xl py-2.5 font-bold text-xs bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center space-x-1.5"
+        >
+          <span>Abrir Painel de Moderação</span>
+          <ArrowRight className="w-3.5 h-3.5" />
+        </Button>
       </div>
 
       {/* Botão de Logout */}
