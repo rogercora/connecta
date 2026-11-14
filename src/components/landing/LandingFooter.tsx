@@ -1,139 +1,88 @@
 import React from 'react';
 import Link from 'next/link';
-import { Radio, Database, Shield, ExternalLink } from 'lucide-react';
+import { ExternalLink, ShieldCheck } from 'lucide-react';
+import { ConnectaLogo } from './LandingNavbar';
+
+const COLUMNS = [
+  {
+    title: 'Participar',
+    links: [
+      { label: 'Processos ativos', href: '#processos' },
+      { label: 'Como funciona', href: '#como-funciona' },
+      { label: 'Cidades', href: '#cidades' },
+      { label: 'Pautas de SJC', href: '/feed' },
+    ],
+  },
+  {
+    title: 'Transparência',
+    links: [
+      { label: 'Dados abertos (Querido Diário)', href: 'https://queridodiario.ok.org.br/', external: true },
+      { label: 'Privacidade e LGPD', href: '/cadastro' },
+      { label: 'Termos de uso', href: '/login' },
+    ],
+  },
+  {
+    title: 'Conta',
+    links: [
+      { label: 'Criar conta verificada', href: '/cadastro' },
+      { label: 'Entrar', href: '/login' },
+      { label: 'Instagram', href: 'https://instagram.com', external: true },
+    ],
+  },
+];
 
 export const LandingFooter: React.FC = () => {
   return (
-    <footer className="border-t border-zinc-800/80 bg-[#09090B] py-14 text-sm text-zinc-400">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <footer className="border-t border-zinc-200 bg-[#F4F5F7]">
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         <div className="grid gap-10 md:grid-cols-12">
-          {/* Brand */}
           <div className="md:col-span-5">
-            <Link href="/" className="inline-flex items-center gap-2.5 text-white">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-500/30 bg-emerald-500/15 text-emerald-400">
-                <Radio className="h-4 w-4" />
-              </span>
-              <span className="font-display text-lg font-bold tracking-tight">
-                Connecta
-              </span>
-            </Link>
-            <p className="mt-3 max-w-sm text-xs leading-relaxed text-zinc-400 sm:text-sm">
-              Plataforma independente de inteligência cívica e participação geolocalizada por CEP. Sem partidos, sem verba pública e sem bots.
+            <ConnectaLogo />
+            <p className="mt-4 max-w-sm text-sm leading-relaxed text-zinc-600">
+              Plataforma independente de democracia participativa por CEP. Sem partido, sem verba pública, sem robôs.
             </p>
-            <div className="mt-4 inline-flex items-center gap-2 rounded-lg border border-zinc-800 bg-[#121215] px-3 py-1.5 text-xs text-zinc-300">
-              <Database className="h-3.5 w-3.5 text-emerald-400" />
-              <span>Dados Abertos & Querido Diário</span>
+          </div>
+
+          {COLUMNS.map((col) => (
+            <div key={col.title} className="md:col-span-2 lg:col-span-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-900">{col.title}</h3>
+              <ul className="mt-3 space-y-2.5 text-sm">
+                {col.links.map((link) => (
+                  <li key={link.label}>
+                    {'external' in link && link.external ? (
+                      <a
+                        href={link.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-zinc-600 hover:text-sky-700"
+                      >
+                        {link.label}
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    ) : link.href.startsWith('#') ? (
+                      <a href={link.href} className="text-zinc-600 hover:text-sky-700">
+                        {link.label}
+                      </a>
+                    ) : (
+                      <Link href={link.href} className="text-zinc-600 hover:text-sky-700">
+                        {link.label}
+                      </Link>
+                    )}
+                  </li>
+                ))}
+              </ul>
             </div>
-          </div>
-
-          {/* Plataforma */}
-          <div className="md:col-span-2">
-            <h4 className="font-display text-xs font-semibold uppercase tracking-wider text-zinc-200">
-              Plataforma
-            </h4>
-            <ul className="mt-3 space-y-2.5 text-xs sm:text-sm">
-              <li>
-                <a href="#como-funciona" className="hover:text-white transition-colors">
-                  Como Funciona
-                </a>
-              </li>
-              <li>
-                <a href="#seguranca" className="hover:text-white transition-colors">
-                  Por que é Seguro
-                </a>
-              </li>
-              <li>
-                <a href="#cidades" className="hover:text-white transition-colors">
-                  Ranking de Cidades
-                </a>
-              </li>
-              <li>
-                <Link href="/feed" className="hover:text-white transition-colors">
-                  Feed Público (SJC)
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Transparência & LGPD */}
-          <div className="md:col-span-3">
-            <h4 className="font-display text-xs font-semibold uppercase tracking-wider text-zinc-200">
-              Transparência & LGPD
-            </h4>
-            <ul className="mt-3 space-y-2.5 text-xs sm:text-sm">
-              <li>
-                <a
-                  href="https://queridodiario.ok.org.br/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 hover:text-white transition-colors"
-                >
-                  <span>Manifesto Dados Abertos</span>
-                  <ExternalLink className="h-3 w-3" />
-                </a>
-              </li>
-              <li>
-                <Link href="/cadastro" className="hover:text-white transition-colors">
-                  Política de Privacidade (LGPD)
-                </Link>
-              </li>
-              <li>
-                <Link href="/login" className="hover:text-white transition-colors">
-                  Termos de Uso & Moderação
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Comunidade */}
-          <div className="md:col-span-2">
-            <h4 className="font-display text-xs font-semibold uppercase tracking-wider text-zinc-200">
-              Redes & Acesso
-            </h4>
-            <ul className="mt-3 space-y-2.5 text-xs sm:text-sm">
-              <li>
-                <Link href="/cadastro" className="text-emerald-400 hover:text-emerald-300 transition-colors">
-                  Verificar meu CEP
-                </Link>
-              </li>
-              <li>
-                <Link href="/login" className="hover:text-white transition-colors">
-                  Entrar na conta
-                </Link>
-              </li>
-              <li>
-                <a
-                  href="https://instagram.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-white transition-colors"
-                >
-                  Instagram
-                </a>
-              </li>
-              <li>
-                <a
-                  href="https://x.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-white transition-colors"
-                >
-                  X (Twitter)
-                </a>
-              </li>
-            </ul>
-          </div>
+          ))}
         </div>
 
-        <div className="mt-12 flex flex-col items-start justify-between gap-4 border-t border-zinc-800/80 pt-6 text-xs text-zinc-500 sm:flex-row sm:items-center">
-          <p>© {new Date().getFullYear()} Connecta Cidadania. Todos os direitos reservados.</p>
-          <div className="flex items-center gap-2">
-            <Shield className="h-3.5 w-3.5 text-emerald-400" />
-            <span>Identidade protegida conforme Lei nº 13.709/2018 (LGPD).</span>
-          </div>
+        <div className="mt-10 flex flex-col gap-3 border-t border-zinc-200 pt-6 text-xs text-zinc-500 sm:flex-row sm:items-center sm:justify-between">
+          <p>© {new Date().getFullYear()} Connecta Brasil.</p>
+          <p className="flex items-center gap-1.5">
+            <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+            Dados pessoais protegidos conforme a Lei nº 13.709/2018 (LGPD).
+          </p>
         </div>
       </div>
     </footer>
   );
 };
-

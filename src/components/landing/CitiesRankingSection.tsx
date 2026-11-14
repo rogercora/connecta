@@ -1,124 +1,85 @@
 'use client';
 
 import React from 'react';
-import { ArrowUpRight, MapPin } from 'lucide-react';
+import { ArrowUp, BadgeCheck } from 'lucide-react';
+import { CITY_GOALS, formatNumber } from './shared';
 
 interface CitiesRankingSectionProps {
   onFocusCep: () => void;
 }
 
-const cities = [
-  {
-    name: 'São José dos Campos (SP)',
-    status: 'active' as const,
-    statusLabel: '🟢 Ativa (Piloto Oficial)',
-    progressText: '100% liberada • Leitura diária ao vivo',
-    pct: 100,
-  },
-  {
-    name: 'Jacareí (SP)',
-    status: 'queue' as const,
-    statusLabel: '🟡 241 / 300 moradores (80% para liberar)',
-    progressText: 'Faltam 59 moradores verificados',
-    pct: 80,
-  },
-  {
-    name: 'Taubaté (SP)',
-    status: 'queue' as const,
-    statusLabel: '🟡 165 / 300 moradores (55% para liberar)',
-    progressText: 'Faltam 135 moradores verificados',
-    pct: 55,
-  },
-  {
-    name: 'Campinas (SP)',
-    status: 'queue' as const,
-    statusLabel: '🟡 112 / 300 moradores (37% para liberar)',
-    progressText: 'Faltam 188 moradores verificados',
-    pct: 37,
-  },
-];
-
-export const CitiesRankingSection: React.FC<CitiesRankingSectionProps> = ({
-  onFocusCep,
-}) => {
+export const CitiesRankingSection: React.FC<CitiesRankingSectionProps> = ({ onFocusCep }) => {
   return (
-    <section
-      id="cidades"
-      className="border-t border-zinc-800/70 bg-[#09090B] py-20 sm:py-24"
-    >
-      <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-2xl text-center">
-          <span className="inline-flex items-center rounded-full border border-zinc-800 bg-zinc-900/90 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-zinc-400">
-            Meta de Expansão
-          </span>
-          <h2 className="font-display mt-4 text-3xl font-bold tracking-tight text-white sm:text-4xl">
-            Ranking de Liberação de Cidades
+    <section id="cidades" className="scroll-mt-28 border-y border-zinc-200 bg-[#F4F5F7] py-16 sm:py-20">
+      <div className="mx-auto grid max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-12 lg:px-8">
+        <div className="lg:col-span-5">
+          <p className="text-sm font-bold uppercase tracking-wider text-sky-700">Expansão nacional</p>
+          <h2 className="mt-2 font-display text-3xl font-extrabold tracking-tight text-zinc-900 sm:text-4xl">
+            Sua cidade ainda não está ativa? Puxe a mobilização.
           </h2>
-          <p className="mt-3 text-base text-zinc-400">
-            Liberamos o monitoramento automático assim que a comunidade local atinge 300 moradores verificados.
+          <p className="mt-4 text-lg leading-relaxed text-zinc-600">
+            Cada cidade é liberada quando um número mínimo de moradores verificados entra na fila. Quanto mais vizinhos, mais rápido.
           </p>
-        </div>
-
-        <div className="mt-10 overflow-hidden rounded-2xl border border-zinc-800 bg-[#121215] divide-y divide-zinc-800/80">
-          {cities.map((city) => {
-            const isActive = city.status === 'active';
-            return (
-              <div
-                key={city.name}
-                className="flex flex-col gap-4 p-5 transition-colors hover:bg-zinc-900/50 sm:flex-row sm:items-center sm:justify-between sm:p-6"
-              >
-                <div className="flex items-start gap-3.5 sm:items-center">
-                  <div
-                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${
-                      isActive
-                        ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
-                        : 'border-amber-500/30 bg-amber-500/10 text-amber-400'
-                    }`}
-                  >
-                    <MapPin className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-display text-base font-bold text-white sm:text-lg">
-                      {city.name}
-                    </h3>
-                    <p className="mt-0.5 text-xs text-zinc-400">{city.progressText}</p>
-                  </div>
-                </div>
-
-                <div className="w-full sm:w-72">
-                  <div className="mb-2 flex items-center justify-between gap-2 text-xs font-semibold">
-                    <span className={isActive ? 'text-emerald-300' : 'text-amber-300'}>
-                      {city.statusLabel}
-                    </span>
-                  </div>
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-900">
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ${
-                        isActive
-                          ? 'bg-emerald-500'
-                          : 'bg-gradient-to-r from-amber-500 to-amber-300'
-                      }`}
-                      style={{ width: `${city.pct}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="mt-8 text-center">
           <button
             type="button"
             onClick={onFocusCep}
-            className="inline-flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-6 py-3.5 text-sm font-semibold text-emerald-300 transition-all hover:border-emerald-400 hover:bg-emerald-500/20"
+            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-orange-600 px-5 py-3.5 text-base font-bold text-white shadow-sm hover:bg-orange-700"
           >
-            <span>Não viu sua cidade? Cadastre seu CEP no topo e puxe a fila.</span>
-            <ArrowUpRight className="h-4 w-4" />
+            <ArrowUp className="h-4 w-4" />
+            Colocar minha cidade na fila
           </button>
         </div>
+
+        <ul className="space-y-3 lg:col-span-7">
+          {CITY_GOALS.map((city) => {
+            const pct = Math.min(100, Math.floor((city.current / city.goal) * 100));
+            const missing = city.goal - city.current;
+
+            return (
+              <li key={city.name} className="rounded-xl border border-zinc-200 bg-white p-5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="font-display text-lg font-bold text-zinc-900">
+                    {city.name} <span className="text-zinc-500">({city.uf})</span>
+                  </h3>
+                  {city.active ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800">
+                      <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                      Ativa • {formatNumber(city.current)} cidadãos verificados
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-orange-50 px-3 py-1 text-xs font-bold text-orange-800">
+                      <span className="h-2 w-2 rounded-full bg-orange-500" />
+                      {formatNumber(city.current)} / {formatNumber(city.goal)} moradores
+                    </span>
+                  )}
+                </div>
+
+                <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-zinc-100">
+                  <div
+                    className={`h-full rounded-full ${city.active ? 'bg-emerald-500' : 'bg-gradient-to-r from-orange-400 to-orange-600'}`}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+
+                <p className="mt-2 flex items-center gap-1.5 text-sm text-zinc-600">
+                  {city.active ? (
+                    <>
+                      <BadgeCheck className="h-4 w-4 text-emerald-600" />
+                      Piloto oficial em funcionamento
+                    </>
+                  ) : missing <= 40 ? (
+                    <strong className="text-orange-700">Faltam {missing} para liberar!</strong>
+                  ) : (
+                    <span>
+                      {pct}% da meta • faltam {missing} moradores
+                    </span>
+                  )}
+                </p>
+              </li>
+            );
+          })}
+        </ul>
       </div>
     </section>
   );
 };
-
