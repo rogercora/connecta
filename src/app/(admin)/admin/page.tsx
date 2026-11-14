@@ -47,15 +47,17 @@ export default function AdminPage() {
   const [edicaoSelecionada, setEdicaoSelecionada] = useState<EdicaoSJC | null>(null);
 
   // Estados da Ingestão Manual / Outras Cidades
-  const [manualCidade, setManualCidade] = useState('Jacareí');
+  const [manualCidade, setManualCidade] = useState('São José dos Campos');
   const [manualCidadeCustom, setManualCidadeCustom] = useState('');
   const [manualEstado, setManualEstado] = useState('SP');
   const [manualBairro, setManualBairro] = useState('Centro');
-  const [manualFonte, setManualFonte] = useState('Boletim Oficial de Jacareí');
-  const [manualModo, setManualModo] = useState<'texto' | 'pdf'>('texto');
+  const [manualFonte, setManualFonte] = useState('Diário do Município de São José dos Campos');
+  const [manualModo, setManualModo] = useState<'texto' | 'pdf'>('pdf');
   const [manualTexto, setManualTexto] = useState('');
   const [manualPdfFile, setManualPdfFile] = useState<File | null>(null);
   const [manualPdfBase64, setManualPdfBase64] = useState<string | null>(null);
+  const [autoDetectNotice, setAutoDetectNotice] = useState<string | null>(null);
+  const [fonteIA, setFonteIA] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Configurações da IA
@@ -226,10 +228,13 @@ CONTEÚDO PUBLICADO: ${edicao.texto_resumo}
 
       const data = await res.json();
       if (data.pauta) {
+        setFonteIA(data.source || 'ia');
+        const cidadeDetectada = data.pauta.cidade_alvo || cidadeFinal;
+
         setPautaRascunho({
           ...data.pauta,
           bairro_alvo: manualBairro || data.pauta.bairro_alvo,
-          cidade_alvo: cidadeFinal,
+          cidade_alvo: cidadeDetectada,
           estado_alvo: manualEstado,
         });
 
@@ -237,7 +242,7 @@ CONTEÚDO PUBLICADO: ${edicao.texto_resumo}
           id: Date.now(),
           numero: Math.floor(100 + Math.random() * 900),
           data: new Date().toLocaleDateString('pt-BR'),
-          tipo: `Diário Oficial de ${cidadeFinal}`,
+          tipo: `Diário Oficial de ${cidadeDetectada}`,
           pdf_url: '',
           titulo_destaque: data.pauta.titulo,
           bairro_sugerido: manualBairro,
@@ -252,7 +257,7 @@ CONTEÚDO PUBLICADO: ${edicao.texto_resumo}
     }
   };
 
-  // Upload do PDF e conversão para Base64
+  // Upload do PDF, auto-detecção de município e conversão para Base64
   const handlePdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -271,6 +276,33 @@ CONTEÚDO PUBLICADO: ${edicao.texto_resumo}
     }
 
     setManualPdfFile(file);
+
+    // Auto-detecção inteligente de município a partir do nome do arquivo
+    const nomeLower = file.name.toLowerCase();
+    if (
+      nomeLower.startsWith('dm_') ||
+      nomeLower.includes('sjc') ||
+      nomeLower.includes('sao_jose') ||
+      nomeLower.includes('são josé')
+    ) {
+      setManualCidade('São José dos Campos');
+      setManualFonte('Diário do Município de São José dos Campos');
+      setAutoDetectNotice('✅ Arquivo identificado como Diário Oficial de São José dos Campos. Município selecionado automaticamente.');
+    } else if (nomeLower.includes('jacarei') || nomeLower.includes('jacareí')) {
+      setManualCidade('Jacareí');
+      setManualFonte('Boletim Oficial de Jacareí');
+      setAutoDetectNotice('✅ Arquivo identificado como Boletim Oficial de Jacareí.');
+    } else if (nomeLower.includes('cacapava') || nomeLower.includes('caçapava')) {
+      setManualCidade('Caçapava');
+      setManualFonte('Diário Oficial de Caçapava');
+      setAutoDetectNotice('✅ Arquivo identificado como Diário Oficial de Caçapava.');
+    } else if (nomeLower.includes('taubate') || nomeLower.includes('taubaté')) {
+      setManualCidade('Taubaté');
+      setManualFonte('Diário Oficial de Taubaté');
+      setAutoDetectNotice('✅ Arquivo identificado como Diário Oficial de Taubaté.');
+    } else {
+      setAutoDetectNotice(null);
+    }
 
     const reader = new FileReader();
     reader.onload = () => {
@@ -384,12 +416,44 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
           </div>
         </div>
 
-        <div className="flex items-center space-x-2">
-          <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2.5 py-1 rounded-full border border-emerald-200">
+        <div className="flex flex-wrap items-center gap-2">
+          {apiKey ? (
+            <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2.5 py-1 rounded-full border border-emerald-200 flex items-center space-x-1">
+              <Sparkles className="w-3 h-3 text-emerald-600" />
+              <span>IA Gemini Conectada</span>
+            </span>
+          ) : (
+            <button
+              onClick={() => setActiveTab('config')}
+              className="text-[10px] bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold px-2.5 py-1 rounded-full border border-amber-300 flex items-center space-x-1 transition-colors"
+            >
+              <span>⚠️ Modo Local (Configurar Chave Gemini)</span>
+            </button>
+          )}
+          <span className="text-[10px] bg-gray-100 text-gray-700 font-bold px-2.5 py-1 rounded-full border border-gray-200">
             Curadoria Humana Ativa
           </span>
         </div>
       </div>
+
+      {/* Alerta de Modo de IA quando não há chave configurada */}
+      {!apiKey && (
+        <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-amber-900 animate-fadeIn">
+          <div className="flex items-center space-x-2">
+            <span className="text-base">💡</span>
+            <span>
+              <strong>Dica de Produção:</strong> Nenhuma chave do Gemini está salva. O sistema está usando o <strong>Extrator Local Inteligente</strong>. Para a IA ler e analisar o PDF na íntegra com raciocínio contextual do <strong>Google Gemini 1.5 Flash</strong>, adicione sua chave gratuita na{' '}
+              <button
+                onClick={() => setActiveTab('config')}
+                className="font-bold underline hover:text-amber-950"
+              >
+                Aba 4 (Chave IA & Prompts)
+              </button>
+              .
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex border-b border-gray-200 space-x-1 sm:space-x-4 overflow-x-auto">
@@ -468,9 +532,16 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
           <div className="flex items-center justify-between border-b border-emerald-200 pb-3">
             <div className="flex items-center space-x-2">
               <Sparkles className="w-5 h-5 text-emerald-700" />
-              <h3 className="text-sm sm:text-base font-black text-emerald-950">
-                A IA gerou a pauta para {pautaRascunho.cidade_alvo || 'o Município'}. Você aprova a publicação?
-              </h3>
+              <div>
+                <h3 className="text-sm sm:text-base font-black text-emerald-950">
+                  Pauta Gerada para {pautaRascunho.cidade_alvo || 'o Município'}. Você aprova a publicação?
+                </h3>
+                <span className="text-[10px] font-bold text-emerald-700">
+                  {fonteIA?.includes('gemini')
+                    ? '✨ Processado com o modelo oficial Google Gemini 1.5 Flash'
+                    : '🔍 Processado pelo Extrator Local Inteligente (Motor de contingência)'}
+                </span>
+              </div>
             </div>
             <button
               onClick={() => setPautaRascunho(null)}
@@ -647,6 +718,13 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
             </button>
           </div>
 
+          <div className="p-3 bg-emerald-50/60 border border-emerald-200 rounded-2xl flex items-center space-x-2 text-xs text-emerald-950">
+            <span className="text-base">💡</span>
+            <span>
+              <strong>Dica para São José dos Campos:</strong> As edições oficiais (inclusive a <strong>Edição nº 3.826 de 11/11/2026</strong>) são conectadas ao vivo abaixo. Basta clicar em <strong>&quot;Resumir com IA e Revisar&quot;</strong> direto na publicação desejada, sem precisar baixar ou subir arquivos manualmente!
+            </span>
+          </div>
+
           {loadingEdicoes ? (
             <div className="py-16 text-center text-xs text-gray-500 space-y-2 bg-white rounded-2xl border border-gray-200">
               <RefreshCw className="w-6 h-6 text-emerald-600 animate-spin mx-auto" />
@@ -742,17 +820,21 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
                 onChange={(e) => {
                   setManualCidade(e.target.value);
                   if (e.target.value !== 'OUTRA') {
-                    setManualFonte(`Diário Oficial de ${e.target.value}`);
+                    setManualFonte(
+                      e.target.value === 'São José dos Campos'
+                        ? 'Diário do Município de São José dos Campos'
+                        : `Diário Oficial de ${e.target.value}`
+                    );
                   }
                 }}
                 className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 focus:ring-2 focus:ring-emerald-500"
               >
+                <option value="São José dos Campos">São José dos Campos - SP (Piloto Ativo)</option>
                 <option value="Jacareí">Jacareí - SP</option>
                 <option value="Caçapava">Caçapava - SP</option>
                 <option value="Taubaté">Taubaté - SP</option>
                 <option value="Pindamonhangaba">Pindamonhangaba - SP</option>
                 <option value="Guaratinguetá">Guaratinguetá - SP</option>
-                <option value="São José dos Campos">São José dos Campos - SP</option>
                 <option value="OUTRA">+ Outra Cidade (Digitar)</option>
               </select>
             </div>
@@ -798,6 +880,12 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
               />
             </div>
           </div>
+
+          {autoDetectNotice && (
+            <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-800 flex items-center space-x-2 animate-fadeIn">
+              <span>{autoDetectNotice}</span>
+            </div>
+          )}
 
           {/* Exemplos Rápidos com 1 Clique */}
           <div className="space-y-1.5 bg-neutral-50 p-3 rounded-xl border border-gray-200">
@@ -895,6 +983,11 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
                     <p className="text-[10px] text-gray-500">
                       Tamanho: {(manualPdfFile.size / 1024).toFixed(1)} KB • Pronto para leitura direta com a IA
                     </p>
+                    {autoDetectNotice && (
+                      <p className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200 inline-block mt-1">
+                        {autoDetectNotice}
+                      </p>
+                    )}
                     <span className="text-[11px] text-emerald-600 underline font-semibold block pt-1">
                       Clique para trocar de arquivo
                     </span>
@@ -912,6 +1005,13 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
                 )}
               </div>
             </div>
+          )}
+
+          {/* Aviso sobre o modo de processamento */}
+          {!apiKey && (
+            <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-center">
+              ⚙️ Sem chave Gemini configurada: o sistema processará o PDF através do <strong>Extrator Local Inteligente</strong> (lendo atos oficiais, contratos e secretarias direto do arquivo).
+            </p>
           )}
 
           {/* Botão de Processar */}
