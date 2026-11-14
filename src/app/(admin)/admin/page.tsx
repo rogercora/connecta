@@ -262,6 +262,14 @@ CONTEÚDO PUBLICADO: ${edicao.texto_resumo}
       return;
     }
 
+    // Alerta de tamanho máximo para servidores em nuvem (4.5 MB)
+    if (file.size > 4.5 * 1024 * 1024) {
+      alert(
+        `O arquivo selecionado possui ${(file.size / (1024 * 1024)).toFixed(1)} MB.\n\nPara garantir o processamento rápido pela IA e respeitar os limites de envio da nuvem, envie um PDF de até 4 MB (ex: selecione apenas as páginas do edital/decreto) ou use a "Opção A: Colar Texto".`
+      );
+      return;
+    }
+
     setManualPdfFile(file);
 
     const reader = new FileReader();
