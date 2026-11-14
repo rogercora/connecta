@@ -7,14 +7,18 @@ import { INITIAL_PAUTA } from '@/stores/feedStore';
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const cidade = searchParams.get('cidade') || 'São José dos Campos';
+    const cidade = searchParams.get('cidade');
     const status = searchParams.get('status'); // 'ativa', 'todos', etc.
 
     let query = supabase
       .from('pautas_ia')
       .select('*')
-      .ilike('cidade_alvo', `%${cidade}%`)
       .order('created_at', { ascending: false });
+
+    // Filtra por cidade a menos que seja explicitamente 'todas'
+    if (cidade && cidade !== 'todas') {
+      query = query.ilike('cidade_alvo', `%${cidade}%`);
+    }
 
     if (status && status !== 'todos') {
       query = query.eq('status', status);
