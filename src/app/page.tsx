@@ -1,23 +1,35 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useRef } from 'react';
+import { LandingNavbar } from '@/components/landing/LandingNavbar';
+import { HeroSection } from '@/components/landing/HeroSection';
+import { BeforeAfterSection } from '@/components/landing/BeforeAfterSection';
+import { PowerLevelsSection } from '@/components/landing/PowerLevelsSection';
+import { SecurityShieldSection } from '@/components/landing/SecurityShieldSection';
+import { CitiesRankingSection } from '@/components/landing/CitiesRankingSection';
+import { LandingFooter } from '@/components/landing/LandingFooter';
 
 export default function HomePage() {
-  const router = useRouter();
+  const cepInputRef = useRef<HTMLInputElement | null>(null);
 
-  useEffect(() => {
-    router.replace('/feed');
-  }, [router]);
+  const handleFocusCep = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => {
+      cepInputRef.current?.focus();
+    }, 350);
+  };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-white p-4">
-      <div className="flex flex-col items-center space-y-3">
-        <span className="font-black text-3xl tracking-tighter text-gray-900">
-          Conecta
-        </span>
-        <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-      </div>
+    <div className="min-h-screen bg-[#09090B] text-zinc-100 selection:bg-emerald-500/30 selection:text-emerald-200">
+      <LandingNavbar onFocusCep={handleFocusCep} />
+      <main>
+        <HeroSection cepInputRef={cepInputRef} />
+        <BeforeAfterSection />
+        <PowerLevelsSection />
+        <SecurityShieldSection />
+        <CitiesRankingSection onFocusCep={handleFocusCep} />
+      </main>
+      <LandingFooter />
     </div>
   );
 }

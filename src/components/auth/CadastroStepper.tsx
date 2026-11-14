@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { User, Mail, Lock, Phone, MapPin, CheckCircle, ArrowRight, ArrowLeft, Clock } from 'lucide-react';
@@ -26,6 +26,22 @@ export const CadastroStepper: React.FC = () => {
   const [cep, setCep] = useState('');
   const { buscarCEP, endereco, loading: loadingCep } = useGeolocation();
   const [loadingSubmit, setLoadingSubmit] = useState(false);
+  const prefilledCepRef = useRef(false);
+
+  useEffect(() => {
+    if (prefilledCepRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const cepParam = params.get('cep');
+    if (cepParam) {
+      const formatted = formatCEP(cepParam);
+      if (formatted.replace(/\D/g, '').length === 8) {
+        prefilledCepRef.current = true;
+        setCep(formatted);
+        void buscarCEP(formatted);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleCepChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatCEP(e.target.value);
