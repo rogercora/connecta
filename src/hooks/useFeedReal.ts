@@ -37,7 +37,11 @@ export function useCidadeStatus(cidade: string, estado: string) {
   });
 }
 
-export function usePautas(feedLevel: FeedLevel, userCidade: string = 'São José dos Campos', userBairro: string = 'Jardim Aquárius') {
+export function usePautas(
+  feedLevel: FeedLevel,
+  userCidade: string = 'São José dos Campos',
+  userBairro: string = 'Jardim Aquárius'
+) {
   return useQuery({
     queryKey: ['pautas', feedLevel, userCidade, userBairro],
     queryFn: async () => {
@@ -48,7 +52,10 @@ export function usePautas(feedLevel: FeedLevel, userCidade: string = 'São José
         .order('created_at', { ascending: false });
 
       if (feedLevel === 'bairro') {
-        query = query.ilike('bairro_alvo', `%${userBairro}%`);
+        // No feed de bairro: prioriza pautas do bairro do morador, Centro, Geral ou de toda a cidade
+        query = query.or(
+          `bairro_alvo.ilike.%${userBairro}%,bairro_alvo.ilike.%Geral%,bairro_alvo.ilike.%Toda a Cidade%,bairro_alvo.ilike.%Centro%,cidade_alvo.ilike.%${userCidade}%`
+        );
       } else if (feedLevel === 'cidade') {
         query = query.ilike('cidade_alvo', `%${userCidade}%`);
       }
@@ -59,22 +66,12 @@ export function usePautas(feedLevel: FeedLevel, userCidade: string = 'São José
         throw error;
       }
 
-      // Se no bairro não tiver pauta específica, busca as da cidade para não ficar vazio
-      if (feedLevel === 'bairro' && (!data || data.length === 0)) {
-        const { data: dataCidade } = await supabase
-          .from('pautas_ia')
-          .select('*')
-          .eq('status', 'ativa')
-          .ilike('cidade_alvo', `%${userCidade}%`)
-          .order('created_at', { ascending: false });
-
-        return (dataCidade ?? []) as PautaIA[];
-      }
-
       return (data ?? []) as PautaIA[];
     },
     retry: 1,
-    staleTime: 1000 * 60,
+    staleTime: 0, // Sempre atualizado para exibir pautas recém-aprovadas no feed imediatamente
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 }
 

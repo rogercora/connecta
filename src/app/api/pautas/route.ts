@@ -86,45 +86,67 @@ export async function POST(req: Request) {
       votos_discordar: 0,
     };
 
-    // Tenta gravar usando a service_role do Supabase
-    const { data, error } = await supabaseAdmin
-      .from('pautas_ia')
-      .insert([novaPauta])
-      .select()
-      .single();
+    // Tenta gravar no Supabase usando supabaseAdmin
+    let pautaCriada: any = null;
 
-    if (error) {
-      console.warn('Supabase Admin insert falhou, tentando cliente padrão:', error.message);
-      // Tenta fallback com client normal
-      const { data: dataClient, error: errorClient } = await supabase
+    try {
+      const { data, error } = await supabaseAdmin
         .from('pautas_ia')
         .insert([novaPauta])
         .select()
         .single();
 
-      if (errorClient) {
-        console.warn('Fallback client também falhou:', errorClient.message);
-        // Retorna simulado caso Supabase esteja temporariamente indisponível
-        return NextResponse.json({
-          success: true,
-          pauta: {
-            ...novaPauta,
-            id: `pauta-${Date.now()}`,
-            created_at: new Date().toISOString(),
-          },
-          warning: 'Salvo em modo de contingência local.',
-        });
+      if (!error && data) {
+        pautaCriada = data;
+      } else {
+        console.warn('supabaseAdmin insert retornou erro, tentando via REST direto:', error?.message);
       }
+    } catch (adminErr: any) {
+      console.warn('Exceção ao usar supabaseAdmin:', adminErr.message);
+    }
 
-      return NextResponse.json({
-        success: true,
-        pauta: dataClient,
-      });
+    // Se supabaseAdmin falhou, tenta REST direto com a service key (100% garantido)
+    if (!pautaCriada) {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://fjtbdoeahdtellzbxpsy.supabase.co';
+      const serviceKey =
+        process.env.SUPABASE_SERVICE_ROLE_KEY ||
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+        '';
+
+      try {
+        const restRes = await fetch(`${supabaseUrl}/rest/v1/pautas_ia`, {
+          method: 'POST',
+          headers: {
+            apikey: serviceKey,
+            Authorization: `Bearer ${serviceKey}`,
+            'Content-Type': 'application/json',
+            Prefer: 'return=representation',
+          },
+          body: JSON.stringify(novaPauta),
+        });
+
+        if (restRes.ok) {
+          const restData = await restRes.json();
+          pautaCriada = Array.isArray(restData) ? restData[0] : restData;
+        } else {
+          const errText = await restRes.text();
+          console.warn('REST direto falhou:', errText);
+        }
+      } catch (restErr: any) {
+        console.warn('Exceção ao usar REST direto:', restErr.message);
+      }
+    }
+
+    if (!pautaCriada) {
+      return NextResponse.json(
+        { error: 'Não foi possível gravar a pauta no banco de dados Supabase.' },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({
       success: true,
-      pauta: data,
+      pauta: pautaCriada,
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
