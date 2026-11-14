@@ -70,8 +70,11 @@ export default function AdminPage() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishSuccess, setPublishSuccess] = useState<string | null>(null);
 
-  // Rascunho da pauta para revisão
-  const [pautaRascunho, setPautaRascunho] = useState<PautaIASummarized | null>(null);
+  // Lista de rascunhos de pautas para revisão individual ou em lote
+  const [pautasRascunho, setPautasRascunho] = useState<
+    (PautaIASummarized & { id_temp: string; aprovada?: boolean; descartada?: boolean })[]
+  >([]);
+  const [aprovandoId, setAprovandoId] = useState<string | null>(null);
 
   // Lista de pautas publicadas
   const [pautasPublicadas, setPautasPublicadas] = useState<PautaIA[]>([]);
@@ -143,7 +146,7 @@ export default function AdminPage() {
     setEdicaoSelecionada(edicao);
     setIsProcessing(true);
     setPublishSuccess(null);
-    setPautaRascunho(null);
+    setPautasRascunho([]);
 
     const textoParaIA = `
 ATO OFICIAL: ${edicao.titulo_destaque}
@@ -158,6 +161,7 @@ CONTEÚDO PUBLICADO: ${edicao.texto_resumo}
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          pdf_url: edicao.pdf_url || undefined,
           texto_bruto: textoParaIA,
           municipio: 'São José dos Campos',
           estado: 'SP',
@@ -167,16 +171,22 @@ CONTEÚDO PUBLICADO: ${edicao.texto_resumo}
         }),
       });
 
-      if (!res.ok) throw new Error('Falha ao processar matéria com a IA');
+      if (!res.ok) throw new Error('Falha ao processar matérias da edição');
 
       const data = await res.json();
-      if (data.pauta) {
-        setPautaRascunho({
-          ...data.pauta,
-          bairro_alvo: edicao.bairro_sugerido || data.pauta.bairro_alvo,
-          cidade_alvo: 'São José dos Campos',
-          estado_alvo: 'SP',
-        });
+      setFonteIA(data.source || 'ia');
+      const listaRecebida = data.pautas || (data.pauta ? [data.pauta] : []);
+
+      if (listaRecebida.length > 0) {
+        setPautasRascunho(
+          listaRecebida.map((p: any, i: number) => ({
+            ...p,
+            id_temp: p.id_temp || `pauta_${Date.now()}_${i}`,
+            bairro_alvo: p.bairro_alvo || edicao.bairro_sugerido || 'Centro',
+            cidade_alvo: 'São José dos Campos',
+            estado_alvo: 'SP',
+          }))
+        );
       }
     } catch (err: any) {
       alert(`Erro no processamento da IA: ${err.message}`);
@@ -205,7 +215,7 @@ CONTEÚDO PUBLICADO: ${edicao.texto_resumo}
 
     setIsProcessing(true);
     setPublishSuccess(null);
-    setPautaRascunho(null);
+    setPautasRascunho([]);
 
     try {
       const res = await fetch('/api/ia/summarize', {
@@ -227,27 +237,31 @@ CONTEÚDO PUBLICADO: ${edicao.texto_resumo}
       if (!res.ok) throw new Error('Falha ao processar publicação com a IA');
 
       const data = await res.json();
-      if (data.pauta) {
-        setFonteIA(data.source || 'ia');
-        const cidadeDetectada = data.pauta.cidade_alvo || cidadeFinal;
+      setFonteIA(data.source || 'ia');
+      const listaRecebida = data.pautas || (data.pauta ? [data.pauta] : []);
 
-        setPautaRascunho({
-          ...data.pauta,
-          bairro_alvo: manualBairro || data.pauta.bairro_alvo,
-          cidade_alvo: cidadeDetectada,
-          estado_alvo: manualEstado,
-        });
+      if (listaRecebida.length > 0) {
+        setPautasRascunho(
+          listaRecebida.map((p: any, i: number) => ({
+            ...p,
+            id_temp: p.id_temp || `pauta_${Date.now()}_${i}`,
+            bairro_alvo: p.bairro_alvo || manualBairro || 'Centro',
+            cidade_alvo: p.cidade_alvo || cidadeFinal,
+            estado_alvo: manualEstado,
+          }))
+        );
 
+        const primeira = listaRecebida[0];
         setEdicaoSelecionada({
           id: Date.now(),
           numero: Math.floor(100 + Math.random() * 900),
           data: new Date().toLocaleDateString('pt-BR'),
-          tipo: `Diário Oficial de ${cidadeDetectada}`,
+          tipo: `Diário Oficial de ${primeira.cidade_alvo || cidadeFinal}`,
           pdf_url: '',
-          titulo_destaque: data.pauta.titulo,
+          titulo_destaque: primeira.titulo,
           bairro_sugerido: manualBairro,
-          secretaria: data.pauta.vereador_proponente,
-          texto_resumo: data.pauta.resumo_ia,
+          secretaria: primeira.vereador_proponente,
+          texto_resumo: primeira.resumo_ia,
         });
       }
     } catch (err: any) {
@@ -345,25 +359,26 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
     }
   };
 
-  // 5. APROVAÇÃO FINAL: Publicar no feed dos moradores
-  const handleAprovarEPublicar = async () => {
-    if (!pautaRascunho) return;
+  // 5. APROVAÇÃO INDIVIDUAL: Publicar uma pauta específica no feed dos moradores
+  const handleAprovarPautaIndividual = async (idTemp: string) => {
+    const pauta = pautasRascunho.find((p) => p.id_temp === idTemp);
+    if (!pauta) return;
 
-    setIsPublishing(true);
-    const cidadeDestino = pautaRascunho.cidade_alvo || 'São José dos Campos';
+    setAprovandoId(idTemp);
+    const cidadeDestino = pauta.cidade_alvo || 'São José dos Campos';
 
     try {
       const res = await fetch('/api/pautas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          titulo: pautaRascunho.titulo,
-          resumo_ia: pautaRascunho.resumo_ia,
-          impacto_bairro: pautaRascunho.impacto_bairro,
-          vereador_proponente: pautaRascunho.vereador_proponente,
-          bairro_alvo: pautaRascunho.bairro_alvo,
+          titulo: pauta.titulo,
+          resumo_ia: pauta.resumo_ia,
+          impacto_bairro: pauta.impacto_bairro,
+          vereador_proponente: pauta.vereador_proponente,
+          bairro_alvo: pauta.bairro_alvo,
           cidade_alvo: cidadeDestino,
-          estado_alvo: pautaRascunho.estado_alvo || 'SP',
+          estado_alvo: pauta.estado_alvo || 'SP',
           cep_alvo: '12246-021',
           link_pdf_original: edicaoSelecionada?.pdf_url || null,
           fonte_diario: edicaoSelecionada ? edicaoSelecionada.tipo : `Diário Oficial de ${cidadeDestino}`,
@@ -373,17 +388,64 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
 
       if (!res.ok) throw new Error('Falha ao gravar pauta no banco de dados');
 
-      setPublishSuccess(`✅ Pauta aprovada e publicada no feed de ${cidadeDestino}!`);
-      setPautaRascunho(null);
-      setEdicaoSelecionada(null);
-      setManualPdfFile(null);
-      setManualPdfBase64(null);
-      setManualTexto('');
+      setPautasRascunho((prev) =>
+        prev.map((item) => (item.id_temp === idTemp ? { ...item, aprovada: true } : item))
+      );
+      setPublishSuccess(`✅ Matéria "${pauta.titulo}" aprovada e publicada no feed de ${pauta.bairro_alvo}!`);
+      carregarPautas();
     } catch (err: any) {
-      alert(`Erro ao aprovar pauta: ${err.message}`);
+      alert(`Erro ao aprovar matéria: ${err.message}`);
     } finally {
-      setIsPublishing(false);
+      setAprovandoId(null);
     }
+  };
+
+  // 6. APROVAÇÃO EM LOTE: Publicar todas as matérias pendentes
+  const handleAprovarTodas = async () => {
+    const pendentes = pautasRascunho.filter((p) => !p.aprovada && !p.descartada);
+    if (pendentes.length === 0) return;
+
+    setIsPublishing(true);
+    let aprovadasCount = 0;
+
+    for (const pauta of pendentes) {
+      try {
+        const res = await fetch('/api/pautas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            titulo: pauta.titulo,
+            resumo_ia: pauta.resumo_ia,
+            impacto_bairro: pauta.impacto_bairro,
+            vereador_proponente: pauta.vereador_proponente,
+            bairro_alvo: pauta.bairro_alvo,
+            cidade_alvo: pauta.cidade_alvo || 'São José dos Campos',
+            estado_alvo: pauta.estado_alvo || 'SP',
+            cep_alvo: '12246-021',
+            link_pdf_original: edicaoSelecionada?.pdf_url || null,
+            fonte_diario: edicaoSelecionada ? edicaoSelecionada.tipo : `Diário Oficial de ${pauta.cidade_alvo}`,
+            status: 'ativa',
+          }),
+        });
+        if (res.ok) aprovadasCount++;
+      } catch (e) {
+        console.error('Erro ao aprovar matéria em lote:', e);
+      }
+    }
+
+    setPautasRascunho((prev) =>
+      prev.map((item) => (!item.descartada ? { ...item, aprovada: true } : item))
+    );
+    setIsPublishing(false);
+    setPublishSuccess(`✅ ${aprovadasCount} matérias foram aprovadas e publicadas com sucesso nos feeds dos moradores!`);
+    carregarPautas();
+  };
+
+  // 7. DESCARTAR MATÉRIA INDIVIDUAL
+  const handleDescartarPauta = (idTemp: string) => {
+    setPautasRascunho((prev) =>
+      prev.map((item) => (item.id_temp === idTemp ? { ...item, descartada: true } : item))
+    );
   };
 
   // Excluir pauta
@@ -526,169 +588,221 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
         </div>
       )}
 
-      {/* ÁREA DE REVISÃO E APROVAÇÃO (COMPARTILHADA POR TODAS AS ABAS QUANDO A IA GERA RASCUNHO) */}
-      {pautaRascunho && (
-        <div className="bg-emerald-50/70 border-2 border-emerald-500 rounded-3xl p-5 sm:p-6 shadow-md space-y-4 animate-fadeIn">
-          <div className="flex items-center justify-between border-b border-emerald-200 pb-3">
-            <div className="flex items-center space-x-2">
-              <Sparkles className="w-5 h-5 text-emerald-700" />
+      {/* ÁREA DE REVISÃO E APROVAÇÃO MULTI-PAUTAS */}
+      {pautasRascunho.some((p) => !p.descartada) && (
+        <div className="bg-emerald-50/70 border-2 border-emerald-500 rounded-3xl p-5 sm:p-6 shadow-md space-y-5 animate-fadeIn">
+          {/* Header do Bloco Multi-Pautas */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-emerald-200 pb-3 gap-3">
+            <div className="flex items-center space-x-2.5">
+              <Sparkles className="w-5 h-5 text-emerald-700 shrink-0" />
               <div>
                 <h3 className="text-sm sm:text-base font-black text-emerald-950">
-                  Pauta Gerada para {pautaRascunho.cidade_alvo || 'o Município'}. Você aprova a publicação?
+                  {pautasRascunho.filter((p) => !p.descartada).length}{' '}
+                  {pautasRascunho.filter((p) => !p.descartada).length === 1
+                    ? 'Matéria Identificada nesta Edição'
+                    : 'Matérias Identificadas nesta Edição'}
                 </h3>
                 <span className="text-[10px] font-bold text-emerald-700">
                   {fonteIA?.includes('gemini')
-                    ? '✨ Processado com o modelo oficial Google Gemini 1.5 Flash'
-                    : '🔍 Processado pelo Extrator Local Inteligente (Motor de contingência)'}
+                    ? '✨ Segmentado com o modelo Google Gemini 1.5 Flash'
+                    : '🔍 Segmentado pelo Extrator Local Inteligente (Motor de contingência)'}
                 </span>
               </div>
             </div>
-            <button
-              onClick={() => setPautaRascunho(null)}
-              className="text-xs text-gray-500 hover:text-gray-900 font-bold"
-            >
-              ✕ Fechar
-            </button>
+
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="primary"
+                onClick={handleAprovarTodas}
+                isLoading={isPublishing}
+                disabled={pautasRascunho.every((p) => p.aprovada || p.descartada)}
+                className="py-1.5 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-sm"
+              >
+                <Check className="w-3.5 h-3.5 stroke-[3]" />
+                <span>Aprovar Todas</span>
+              </Button>
+              <button
+                onClick={() => setPautasRascunho([])}
+                className="text-xs text-gray-500 hover:text-gray-900 font-bold px-2 py-1"
+              >
+                ✕ Fechar
+              </button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Lado Esquerdo: Edição do Texto gerado */}
-            <div className="lg:col-span-7 space-y-3">
-              <div>
-                <label className="text-[11px] font-bold text-gray-700 uppercase block mb-1">
-                  Título da Pauta:
-                </label>
-                <input
-                  type="text"
-                  value={pautaRascunho.titulo}
-                  onChange={(e) => setPautaRascunho({ ...pautaRascunho, titulo: e.target.value })}
-                  className="w-full p-2.5 bg-white border border-gray-300 rounded-xl text-xs font-black text-gray-900"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-gray-700 uppercase block mb-1">
-                  Resumo Cidadão (Linguagem que o morador entende):
-                </label>
-                <textarea
-                  rows={2}
-                  value={pautaRascunho.resumo_ia}
-                  onChange={(e) => setPautaRascunho({ ...pautaRascunho, resumo_ia: e.target.value })}
-                  className="w-full p-2.5 bg-white border border-gray-300 rounded-xl text-xs text-gray-800"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-gray-700 uppercase block mb-1">
-                  Impacto Prático no Bairro:
-                </label>
-                <input
-                  type="text"
-                  value={pautaRascunho.impacto_bairro}
-                  onChange={(e) => setPautaRascunho({ ...pautaRascunho, impacto_bairro: e.target.value })}
-                  className="w-full p-2.5 bg-white border border-gray-300 rounded-xl text-xs text-gray-800"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[11px] font-bold text-gray-700 uppercase block mb-1">
-                    Autor / Proponente:
-                  </label>
-                  <input
-                    type="text"
-                    value={pautaRascunho.vereador_proponente}
-                    onChange={(e) => setPautaRascunho({ ...pautaRascunho, vereador_proponente: e.target.value })}
-                    className="w-full p-2 bg-white border border-gray-300 rounded-xl text-xs text-gray-800"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] font-bold text-gray-700 uppercase block mb-1">
-                    Bairro Vinculado:
-                  </label>
-                  <input
-                    type="text"
-                    value={pautaRascunho.bairro_alvo}
-                    onChange={(e) => setPautaRascunho({ ...pautaRascunho, bairro_alvo: e.target.value })}
-                    className="w-full p-2 bg-white border border-gray-300 rounded-xl text-xs text-gray-800"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Lado Direito: Prévia Visual do Card */}
-            <div className="lg:col-span-5 bg-white p-4 rounded-2xl border border-gray-200 shadow-sm space-y-3">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-                <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">
-                  Como o morador verá no Feed:
-                </span>
-                <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
-                  {pautaRascunho.cidade_alvo || 'Município'}
-                </span>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <div className="w-7 h-7 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs">
-                    🏛️
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-gray-900 leading-none">
-                      Meu Bairro: {pautaRascunho.bairro_alvo}
-                    </h4>
-                    <p className="text-[10px] text-gray-400">{pautaRascunho.cidade_alvo} - {pautaRascunho.estado_alvo || 'SP'}</p>
-                  </div>
-                </div>
-
-                <h4 className="text-xs font-black text-gray-900 leading-tight">
-                  {pautaRascunho.titulo}
-                </h4>
-
-                <div className="p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[11px] space-y-1">
-                  <p>
-                    <strong className="text-emerald-700">RESUMO: </strong>
-                    {pautaRascunho.resumo_ia}
-                  </p>
-                  <p className="text-gray-600">
-                    <strong>Impacto: </strong>
-                    {pautaRascunho.impacto_bairro}
-                  </p>
-                  <p className="text-gray-600">
-                    <strong>Autor: </strong>
-                    {pautaRascunho.vereador_proponente}
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-1.5 opacity-80 pt-1">
-                  <div className="py-1.5 rounded-full bg-[#1ea751] text-white text-[10px] font-black text-center">
-                    CONCORDAR
-                  </div>
-                  <div className="py-1.5 rounded-full bg-[#2b2f32] text-white text-[10px] font-black text-center">
-                    DISCORDAR
-                  </div>
-                </div>
-              </div>
-
-              {/* Botões de Decisão */}
-              <div className="pt-2 space-y-2">
-                <Button
-                  variant="primary"
-                  onClick={handleAprovarEPublicar}
-                  isLoading={isPublishing}
-                  className="w-full py-3 rounded-xl font-black bg-emerald-600 hover:bg-emerald-700 text-white shadow-md text-xs flex items-center justify-center space-x-1.5"
+          {/* Lista de Cards de Matérias Segmentadas */}
+          <div className="space-y-4">
+            {pautasRascunho
+              .filter((p) => !p.descartada)
+              .map((pauta, idx) => (
+                <div
+                  key={pauta.id_temp}
+                  className={`p-4 sm:p-5 rounded-2xl border transition-all ${
+                    pauta.aprovada
+                      ? 'bg-emerald-100/70 border-emerald-400'
+                      : 'bg-white border-gray-200 shadow-sm hover:border-emerald-300'
+                  }`}
                 >
-                  <Check className="w-4 h-4 stroke-[3]" />
-                  <span>Aprovar e Liberar no Feed de {pautaRascunho.cidade_alvo}</span>
-                </Button>
-                <button
-                  type="button"
-                  onClick={() => setPautaRascunho(null)}
-                  className="w-full py-1 text-center text-xs text-gray-500 hover:text-red-600 font-semibold"
-                >
-                  Descartar rascunho
-                </button>
-              </div>
-            </div>
+                  {pauta.aprovada ? (
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex items-center space-x-3">
+                        <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
+                        <div>
+                          <span className="text-[10px] uppercase font-black text-emerald-700 tracking-wider">
+                            Matéria #{idx + 1} • Publicada com Sucesso
+                          </span>
+                          <h4 className="text-xs sm:text-sm font-black text-emerald-950">
+                            {pauta.titulo}
+                          </h4>
+                          <p className="text-[11px] text-emerald-800">
+                            Liberada no feed de <strong>{pauta.bairro_alvo}</strong> ({pauta.cidade_alvo} - {pauta.estado_alvo}).
+                          </p>
+                        </div>
+                      </div>
+                      <Link
+                        href="/feed"
+                        className="py-1.5 px-3 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center space-x-1 self-start sm:self-auto shrink-0"
+                      >
+                        <span>Ver no Feed</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {/* Top Bar da Matéria: Categoria, Relevância e Ações */}
+                      <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-[10px] font-black bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-md uppercase">
+                            Matéria #{idx + 1}
+                          </span>
+                          {pauta.categoria && (
+                            <span className="text-[10px] font-bold bg-gray-100 text-gray-700 px-2 py-0.5 rounded-md">
+                              {pauta.categoria === 'gastos' && '💰 Gastos Públicos'}
+                              {pauta.categoria === 'obras' && '🚧 Obras & Infraestrutura'}
+                              {pauta.categoria === 'governanca' && '🏛️ Atos do Executivo'}
+                              {pauta.categoria === 'transporte' && '🚌 Transporte & Mobilidade'}
+                              {pauta.categoria === 'zoneamento' && '📐 Zoneamento & Urbanismo'}
+                              {pauta.categoria === 'geral' && '📋 Legislação Geral'}
+                            </span>
+                          )}
+                          <span className="text-[10px] text-gray-400 font-bold">
+                            Relevância: {pauta.relevancia_score}%
+                          </span>
+                        </div>
+
+                        <button
+                          onClick={() => handleDescartarPauta(pauta.id_temp)}
+                          className="text-[11px] text-gray-400 hover:text-red-600 font-bold flex items-center space-x-1 transition-colors"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                          <span>Descartar Matéria</span>
+                        </button>
+                      </div>
+
+                      {/* Campos Editáveis */}
+                      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+                        <div className="lg:col-span-12">
+                          <label className="text-[10px] font-bold text-gray-600 uppercase block mb-0.5">
+                            Título da Pauta:
+                          </label>
+                          <input
+                            type="text"
+                            value={pauta.titulo}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setPautasRascunho((prev) =>
+                                prev.map((item) => (item.id_temp === pauta.id_temp ? { ...item, titulo: val } : item))
+                              );
+                            }}
+                            className="w-full p-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-black text-gray-900 focus:bg-white focus:ring-1 focus:ring-emerald-500"
+                          />
+                        </div>
+
+                        <div className="lg:col-span-8">
+                          <label className="text-[10px] font-bold text-gray-600 uppercase block mb-0.5">
+                            Resumo Cidadão (Linguagem Acessível):
+                          </label>
+                          <textarea
+                            rows={2}
+                            value={pauta.resumo_ia}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setPautasRascunho((prev) =>
+                                prev.map((item) => (item.id_temp === pauta.id_temp ? { ...item, resumo_ia: val } : item))
+                              );
+                            }}
+                            className="w-full p-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 focus:bg-white focus:ring-1 focus:ring-emerald-500"
+                          />
+                        </div>
+
+                        <div className="lg:col-span-4">
+                          <label className="text-[10px] font-bold text-gray-600 uppercase block mb-0.5">
+                            Impacto Prático:
+                          </label>
+                          <textarea
+                            rows={2}
+                            value={pauta.impacto_bairro}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setPautasRascunho((prev) =>
+                                prev.map((item) => (item.id_temp === pauta.id_temp ? { ...item, impacto_bairro: val } : item))
+                              );
+                            }}
+                            className="w-full p-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 focus:bg-white focus:ring-1 focus:ring-emerald-500"
+                          />
+                        </div>
+
+                        <div className="lg:col-span-6">
+                          <label className="text-[10px] font-bold text-gray-600 uppercase block mb-0.5">
+                            Autor / Secretaria:
+                          </label>
+                          <input
+                            type="text"
+                            value={pauta.vereador_proponente}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setPautasRascunho((prev) =>
+                                prev.map((item) => (item.id_temp === pauta.id_temp ? { ...item, vereador_proponente: val } : item))
+                              );
+                            }}
+                            className="w-full p-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 focus:bg-white"
+                          />
+                        </div>
+
+                        <div className="lg:col-span-6">
+                          <label className="text-[10px] font-bold text-gray-600 uppercase block mb-0.5">
+                            Bairro ou Região Vinculada:
+                          </label>
+                          <input
+                            type="text"
+                            value={pauta.bairro_alvo}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setPautasRascunho((prev) =>
+                                prev.map((item) => (item.id_temp === pauta.id_temp ? { ...item, bairro_alvo: val } : item))
+                              );
+                            }}
+                            className="w-full p-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 focus:bg-white"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Botão de Aprovação Individual */}
+                      <div className="flex items-center justify-end space-x-2 pt-2 border-t border-gray-100">
+                        <Button
+                          variant="primary"
+                          onClick={() => handleAprovarPautaIndividual(pauta.id_temp)}
+                          isLoading={aprovandoId === pauta.id_temp}
+                          className="py-2 px-4 rounded-xl font-bold bg-emerald-600 hover:bg-emerald-700 text-white text-xs flex items-center space-x-1.5 shadow-sm"
+                        >
+                          <Check className="w-3.5 h-3.5 stroke-[3]" />
+                          <span>Aprovar e Publicar no Feed de {pauta.bairro_alvo}</span>
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
           </div>
         </div>
       )}

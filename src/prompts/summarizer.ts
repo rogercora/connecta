@@ -1,6 +1,6 @@
 // ============================================================
 // Connecta — Prompt System para LLM (Claude / Gemini)
-// Ingestão e Sumarização Neutra de Diários Oficiais
+// Ingestão e Sumarização Neutra de Diários Oficiais (Multi-Pautas)
 // ============================================================
 
 export interface DiarioOficialInput {
@@ -13,6 +13,7 @@ export interface DiarioOficialInput {
 }
 
 export interface PautaIASummarized {
+  id_temp?: string;
   titulo: string;
   resumo_ia: string;
   impacto_bairro: string;
@@ -23,44 +24,70 @@ export interface PautaIASummarized {
   estado_alvo: string;
   relevancia_score: number; // 0-100 (impacto na vida do cidadão comum)
   tags: string[];
+  categoria?: 'gastos' | 'obras' | 'transporte' | 'zoneamento' | 'saude' | 'governanca' | 'geral';
 }
 
 export const SYSTEM_SUMMARIZER_PROMPT = `
-Você é o motor de inteligência cívica da plataforma "Conecta".
-Sua missão é transformar textos burocráticos, jurídicos e herméticos de Diários Oficiais e Atas de Câmaras Municipais brasileiras em resumos ultra-claros, objetivos, imparciais e acessíveis para o cidadão comum.
+Você é o motor de inteligência cívica da plataforma "Connecta".
+Sua missão é analisar Diários Oficiais e Atas Municipais brasileiros e extrair exclusivamente matérias com impacto prático na vida dos cidadãos ou no orçamento público municipal.
 
 DIRETRIZES FUNDAMENTAIS:
-1. NEUTRALIDADE TOTAL: Nunca use tom partidário, opinativo, bajulador ou acusatório. Apenas fatos, números e consequências práticas.
-2. LINGUAGEM DIRETA: Evite jargões ("outorga onerosa", "emenda aditiva", "exordial"). Traduza para o cotidiano ("custo extra de construção", "mudança na proposta original").
-3. IMPACTO CONCRETO: Explique o que muda no dia a dia do bairro (ex: "Mais barulho à noite", "Aumento no IPTU", "Nova linha de ônibus", "Risco de alagamento diminuído").
-4. EXTRAÇÃO PRECISA: Identifique sempre que possível o autor da proposta (Vereador, Prefeito ou Comissão) e o bairro/região afetado.
-5. RESPOSTA EM JSON PURO: Responda estritamente com o objeto JSON válido, sem cercaduras markdown extras se solicitado modo raw.
+1. FILTRO DE RELEVÂNCIA CÍVICA (MUITO IMPORTANTE):
+   - IGNORE SUMARIAMENTE ATOS DE ROTINA INTERNA / RH:
+     * Concessão de férias ou licenças médicas de servidores;
+     * Atribuição de gratificações internas e progressões funcionais;
+     * Substituições pontuais de cargos e atos protocolares de expediente.
+   - EXTRAIA MATÉRIAS DE IMPACTO PÚBLICO E COMUNITÁRIO:
+     * Contratos públicos e compras de alto valor (valores em R$, empresas vencedoras, pregões);
+     * Licitações de obras viárias, drenagem, contenção de encostas e pavimentação asfáltica;
+     * Transporte coletivo, mudanças de itinerários, novas linhas e tarifas;
+     * Decretos de zoneamento, uso do solo, ocupação urbana e regras para comércio local;
+     * Saúde pública (reformas em UBSs, mutirões, vacinação e abastecimento de remédios);
+     * Projetos de Lei e decretos que afetam diretamente o cotidiano dos moradores.
+
+2. SEGMENTAÇÃO EM MÚLTIPLAS PAUTAS:
+   - Um Diário Oficial contém diversos atos distintos na mesma data.
+   - Extraia de 1 a 5 matérias distintas de maior relevância cívica encontradas na edição.
+   - Separe cada matéria em um item independente na lista de pautas.
+
+3. NEUTRALIDADE E LINGUAGEM DIRETA:
+   - Sem tom opinativo, bajulador ou partidário.
+   - Traduza termos jurídicos para linguagem clara que qualquer morador compreenda.
+   - Sempre destaque valores em R$, bairros afetados e prazos quando informados no texto.
+
+4. FORMATO OBRIGATÓRIO:
+   - Retorne SEMPRE um JSON válido contendo a propriedade "pautas" com a lista de matérias extraídas.
 `.trim();
 
 export function buildSummarizerPrompt(input: DiarioOficialInput): string {
   return `
 ${SYSTEM_SUMMARIZER_PROMPT}
 
-ENTRADA DE DIÁRIO OFICIAL:
+DADOS DA EDIÇÃO:
 - Município: ${input.municipio} - ${input.estado}
 - Data de Publicação: ${input.data_publicacao}
 - Fonte: ${input.fonte_nome || 'Diário Oficial Municipal'}
 
---- TEXTO BRUTO DO DIÁRIO OFICIAL ---
+--- TEXTO DO DIÁRIO OFICIAL ---
 ${input.texto_bruto}
---- FIM DO TEXTO BRUTO ---
+--- FIM DO TEXTO ---
 
-Gere um JSON com o seguinte schema TypeScript exato:
+Responda ESTRITAMENTE com um objeto JSON no formato abaixo (extraia até 5 matérias relevantes):
 {
-  "titulo": "ALERTA DE IA: Pauta na Câmara",
-  "resumo_ia": "Frase sintética e impactante explicando o que foi votado ou proposto (máx 150 caracteres).",
-  "impacto_bairro": "Explicação objetiva de como a vida no bairro será afetada positiva ou negativamente (máx 120 caracteres).",
-  "vereador_proponente": "Nome completo do vereador ou autor proponente (ou 'Poder Executivo' / 'Mesa Diretora')",
-  "bairro_alvo": "Nome do bairro mais afetado ou 'Geral / Toda a Cidade'",
-  "cidade_alvo": "${input.municipio}",
-  "estado_alvo": "${input.estado}",
-  "relevancia_score": 85, // número de 0 a 100 indicando urgência/impacto popular
-  "tags": ["zoneamento", "obras", "mobilidade"]
+  "pautas": [
+    {
+      "titulo": "ALERTA DE TRANSPARÊNCIA: Homologação de Contrato nº 533/2026",
+      "resumo_ia": "Contratação pública no valor de R$ 6.270.472,79 decorrente de Pregão Eletrônico pela Secretaria de Governança.",
+      "impacto_bairro": "Fiscalização da destinação de recursos públicos municipais.",
+      "vereador_proponente": "Secretaria de Governança - Prefeitura de ${input.municipio}",
+      "bairro_alvo": "Centro",
+      "cidade_alvo": "${input.municipio}",
+      "estado_alvo": "${input.estado}",
+      "relevancia_score": 90,
+      "tags": ["gastos-publicos", "licitacoes", "transparencia"],
+      "categoria": "gastos"
+    }
+  ]
 }
 `.trim();
 }

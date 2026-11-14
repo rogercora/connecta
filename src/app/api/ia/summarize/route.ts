@@ -69,6 +69,7 @@ export async function POST(req: Request) {
     const {
       texto_bruto,
       pdf_base64,
+      pdf_url,
       pdf_nome,
       municipio = 'São José dos Campos',
       estado = 'SP',
@@ -78,10 +79,30 @@ export async function POST(req: Request) {
       customPrompt,
     } = body;
 
+    let finalPdfBase64 = pdf_base64;
+
+    // Se veio uma URL de PDF (como as edições da API oficial de SJC), baixa o buffer do PDF
+    if (!finalPdfBase64 && pdf_url) {
+      try {
+        const downloadRes = await fetch(pdf_url, {
+          headers: {
+            'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          },
+        });
+        if (downloadRes.ok) {
+          const ab = await downloadRes.arrayBuffer();
+          finalPdfBase64 = Buffer.from(ab).toString('base64');
+        }
+      } catch (err) {
+        console.warn('Não foi possível baixar PDF da URL remota:', err);
+      }
+    }
+
     // Se não veio texto nem PDF
-    if (!texto_bruto?.trim() && !pdf_base64) {
+    if (!texto_bruto?.trim() && !finalPdfBase64) {
       return NextResponse.json(
-        { error: 'Por favor, envie o texto da publicação ou anexe um arquivo PDF.' },
+        { error: 'Por favor, envie o texto da publicação, anexe um arquivo PDF ou informe o link da edição.' },
         { status: 400 }
       );
     }
@@ -92,8 +113,8 @@ export async function POST(req: Request) {
     let textoExtraidoPdf = '';
 
     // Extração de texto do PDF caso tenha sido enviado arquivo
-    if (pdf_base64) {
-      textoExtraidoPdf = extractTextFromPdfBase64(pdf_base64);
+    if (finalPdfBase64) {
+      textoExtraidoPdf = extractTextFromPdfBase64(finalPdfBase64);
 
       if (textoExtraidoPdf) {
         const lowerPdf = textoExtraidoPdf.toLowerCase();
@@ -121,7 +142,7 @@ export async function POST(req: Request) {
 
         if (!textoEfetivo) {
           // Usa os trechos mais relevantes do PDF para análise
-          textoEfetivo = textoExtraidoPdf.slice(0, 18000);
+          textoEfetivo = textoExtraidoPdf.slice(0, 25000);
         }
       }
     }
@@ -151,9 +172,9 @@ export async function POST(req: Request) {
 
         const parts: any[] = [{ text: effectivePrompt }];
 
-        // Se veio arquivo PDF em base64, adiciona como parte multimodal nativa do Gemini
-        if (pdf_base64) {
-          const cleanBase64 = pdf_base64.replace(/^data:application\/pdf;base64,/, '');
+        // Se temos o arquivo PDF em base64, adiciona como parte multimodal nativa do Gemini
+        if (finalPdfBase64) {
+          const cleanBase64 = finalPdfBase64.replace(/^data:application\/pdf;base64,/, '');
           parts.push({
             inlineData: {
               mimeType: 'application/pdf',
@@ -184,19 +205,43 @@ export async function POST(req: Request) {
           const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
 
           if (rawText) {
-            const parsed = JSON.parse(rawText) as PautaIASummarized;
-            return NextResponse.json({
-              success: true,
-              source: pdf_base64 ? 'gemini-1.5-flash (pdf-multimodal)' : 'gemini-1.5-flash',
-              is_real_ai: true,
-              pauta: {
-                ...parsed,
-                bairro_alvo: bairro_sugerido || parsed.bairro_alvo || 'Centro',
-                cidade_alvo: parsed.cidade_alvo || municipioEfetivo,
-                estado_alvo: parsed.estado_alvo || estado,
-              },
-              prompt_used: effectivePrompt,
-            });
+            let pautasGemini: PautaIASummarized[] = [];
+            try {
+              const parsed = JSON.parse(rawText);
+              const rawList = Array.isArray(parsed)
+                ? parsed
+                : Array.isArray(parsed.pautas)
+                ? parsed.pautas
+                : [parsed];
+
+              pautasGemini = rawList.map((item: any, idx: number) => ({
+                id_temp: `pauta_${Date.now()}_${idx}`,
+                titulo: item.titulo || 'ALERTA CIDADÃO: Ato Oficial',
+                resumo_ia: item.resumo_ia || item.resumo || '',
+                impacto_bairro: item.impacto_bairro || item.impacto || '',
+                vereador_proponente: item.vereador_proponente || item.autor || `Prefeitura de ${municipioEfetivo}`,
+                bairro_alvo: item.bairro_alvo || bairro_sugerido || 'Centro',
+                cidade_alvo: item.cidade_alvo || municipioEfetivo,
+                estado_alvo: item.estado_alvo || estado,
+                relevancia_score: item.relevancia_score || 85,
+                tags: Array.isArray(item.tags) ? item.tags : ['legislação'],
+                categoria: item.categoria || 'geral',
+              }));
+            } catch (err) {
+              console.warn('Erro ao interpretar JSON do Gemini:', err);
+            }
+
+            if (pautasGemini.length > 0) {
+              return NextResponse.json({
+                success: true,
+                source: finalPdfBase64 ? 'gemini-1.5-flash (pdf-multimodal)' : 'gemini-1.5-flash',
+                is_real_ai: true,
+                total_pautas: pautasGemini.length,
+                pautas: pautasGemini,
+                pauta: pautasGemini[0],
+                prompt_used: effectivePrompt,
+              });
+            }
           }
         } else {
           const errText = await geminiRes.text();
@@ -207,107 +252,134 @@ export async function POST(req: Request) {
       }
     }
 
-    // Motor Heurístico Resiliente (para quando não há chave configurada ou modo offline)
-    const extrairInfo = (texto: string): PautaIASummarized => {
+    // Motor Heurístico Resiliente Multi-Pautas (para quando não há chave configurada ou modo offline)
+    const extrairMultiplasPautas = (texto: string): PautaIASummarized[] => {
       const lower = texto.toLowerCase();
+      const pautas: PautaIASummarized[] = [];
 
-      // Bairro
-      let bairro = bairro_sugerido || 'Centro';
-      if (!bairro_sugerido) {
-        if (lower.includes('urbanova')) bairro = 'Urbanova';
-        else if (lower.includes('santana')) bairro = 'Santana';
-        else if (lower.includes('vila emma') || lower.includes('vl emma') || lower.includes('vila ema')) bairro = 'Vila Ema';
-        else if (lower.includes('satélite') || lower.includes('satelite')) bairro = 'Jardim Satélite';
-        else if (lower.includes('bosque')) bairro = 'Bosque dos Eucaliptos';
-        else if (lower.includes('aquárius') || lower.includes('aquarius')) bairro = 'Jardim Aquárius';
-        else if (lower.includes('meia lua') || lower.includes('parque meia lua')) bairro = 'Parque Meia Lua';
-        else if (lower.includes('esperança')) bairro = 'Jardim Esperança';
-        else if (lower.includes('centro')) bairro = 'Centro';
-      }
-
-      // Proponente
-      let proponente = `Prefeitura Municipal de ${municipioEfetivo}`;
-      const autorMatch = texto.match(/(?:vereador|ver\.|autor|proponente|prefeito)\s+([A-ZÁÉÍÓÚÂÊÔÃÕ][a-záéíóúâêôãõ]+(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕ][a-záéíóúâêôãõ]+){1,3})/i);
-      if (autorMatch && autorMatch[1]) {
-        proponente = `Vereador ${autorMatch[1].trim()}`;
-      } else if (lower.includes('câmara') || lower.includes('camara') || lower.includes('legislativo')) {
-        proponente = `Câmara Municipal de ${municipioEfetivo}`;
-      } else if (lower.includes('secretaria de governança') || lower.includes('secretaria de governanca')) {
-        proponente = `Secretaria de Governança - ${municipioEfetivo}`;
-      } else if (lower.includes('secretaria de gestão administrativa') || lower.includes('gestão administrativa e finanças')) {
-        proponente = `Secretaria de Gestão Administrativa e Finanças - ${municipioEfetivo}`;
-      }
-
-      // Detecção de Contratos e Gastos Públicos
-      const contratoMatch = texto.match(/CONTRATO\s+N[º°\\]*\s*(\d+\/\d+)[^]*?VALOR:\s*(R\$\s*[\d.,]+)/i);
+      // 1. Contratos Públicos e Gastos
+      const contratoMatch = texto.match(/CONTRATO\s+N[º°\\]*\s*(\d+\/\d+)[^]*?VALOR:\s*(R\$\s*[\d.,]+)/i) ||
+                            texto.match(/CONTRATO\s+N[º°\\]*\s*(\d+\/\d+)/i);
       const pregaoMatch = texto.match(/PREG[ÃA]O\s+ELETR[ÔO]NICO\s+N[º°\\]*\s*(\d+\/\d+)/i);
-      const portariaMatch = texto.match(/Portaria\s+n[º°\\]*\s*([^\s,]+)/i);
-
-      // Tags e Temas
-      const tags: string[] = [];
-      let titulo = `ALERTA CIDADÃO: Legislação e Serviços`;
-      let resumo = '';
-      let impacto = `Mudanças nas diretrizes municipais com impacto direto na população de ${municipioEfetivo}.`;
-
       if (contratoMatch && contratoMatch[1]) {
         const numContrato = contratoMatch[1];
         const valor = contratoMatch[2] || '';
-        tags.push('gastos-publicos', 'transparência', 'licitações');
-        titulo = `ALERTA DE TRANSPARÊNCIA: Contrato Municipal nº ${numContrato}`;
-        resumo = `A Prefeitura de ${municipioEfetivo} publicou homologação de contrato público${pregaoMatch ? ` decorrente de Pregão Eletrônico nº ${pregaoMatch[1]}` : ''}${valor ? ` no valor total de ${valor}` : ''}.`;
-        impacto = `Fiscalização pública da aplicação dos recursos municipais e contratação de serviços no município de ${municipioEfetivo}.`;
-      } else if (portariaMatch && portariaMatch[1]) {
-        tags.push('governança', 'atos-oficiais');
-        titulo = `ATO OFICIAL: Portaria nº ${portariaMatch[1]}`;
-        resumo = `Publicada portaria oficial da ${proponente} com determinações administrativas aplicáveis à estrutura pública municipal.`;
-        impacto = `Regulamentação de rotinas e diretrizes dos órgãos públicos de ${municipioEfetivo}.`;
-      } else if (lower.includes('obra') || lower.includes('asfalto') || lower.includes('paviment') || lower.includes('recape')) {
-        tags.push('obras', 'infraestrutura');
-        titulo = `ALERTA DE OBRAS: Pavimentação e Infraestrutura`;
-        resumo = `Publicada licitação ou termo de execução de obras e recapeamento viário no município.`;
-        impacto = `Intervenções viárias e melhorias de pavimentação previstas para a região do ${bairro}.`;
-      } else if (lower.includes('tarifa') || lower.includes('ônibus') || lower.includes('onibus') || lower.includes('transporte') || lower.includes('passe')) {
-        tags.push('transporte', 'mobilidade');
-        titulo = `ALERTA DE MOBILIDADE: Transporte Coletivo`;
-        resumo = `Medida oficial referente a tarifas, itinerários ou linhas do transporte coletivo municipal.`;
-        impacto = `Alteração nos valores de tarifas ou itinerários de linhas que atendem os moradores do ${bairro}.`;
-      } else if (lower.includes('zoneamento') || lower.includes('comercial') || lower.includes('residencial') || lower.includes('loteamento')) {
-        tags.push('zoneamento', 'urbanismo');
-        titulo = `ALERTA DE URBANISMO: Zoneamento e Uso do Solo`;
-        resumo = `Diretrizes municipais sobre ocupação do solo, loteamentos ou regras para atividades comerciais.`;
-        impacto = `Regras de construção e impacto no fluxo de trânsito e vizinhança no ${bairro}.`;
-      } else if (lower.includes('iptu') || lower.includes('imposto') || lower.includes('taxa') || lower.includes('tribut')) {
-        tags.push('tributos', 'finanças');
-        titulo = `ALERTA FISCAL: Tributos Municipais`;
-        resumo = `Normativa sobre tributação municipal, prazos ou recolhimento de taxas.`;
-        impacto = `Ajuste nos valores de tributos e taxas municipais aplicadas aos imóveis de ${municipioEfetivo}.`;
-      } else {
-        tags.push('legislação', 'serviços');
-        const linhas = texto.split('\n').filter((l) => l.trim().length > 15);
-        const primeiraLinha = linhas[0] || texto.slice(0, 150);
-        resumo = `Publicação oficial no Diário Municipal de ${municipioEfetivo}: ${primeiraLinha.slice(0, 120)}`;
+        pautas.push({
+          id_temp: `pauta_${Date.now()}_1`,
+          titulo: `ALERTA DE TRANSPARÊNCIA: Homologação de Contrato nº ${numContrato}`,
+          resumo_ia: `A Prefeitura de ${municipioEfetivo} publicou homologação de contrato público${pregaoMatch ? ` decorrente de Pregão Eletrônico nº ${pregaoMatch[1]}` : ''}${valor ? ` no valor total de ${valor}` : ''}.`,
+          impacto_bairro: `Fiscalização dos gastos públicos municipais e aplicação da Lei Geral de Licitações.`,
+          vereador_proponente: `Secretaria de Gestão Administrativa e Finanças - ${municipioEfetivo}`,
+          bairro_alvo: 'Centro',
+          cidade_alvo: municipioEfetivo,
+          estado_alvo: estado,
+          relevancia_score: 92,
+          tags: ['gastos-publicos', 'licitações', 'transparência'],
+          categoria: 'gastos',
+        });
       }
 
-      return {
-        titulo,
-        resumo_ia: resumo,
-        impacto_bairro: impacto,
-        vereador_proponente: proponente,
-        bairro_alvo: bairro,
-        cidade_alvo: municipioEfetivo,
-        estado_alvo: estado,
-        relevancia_score: 85,
-        tags,
-      };
+      // 2. Portarias do Executivo / Governança
+      const portariaMatch = texto.match(/Portaria\s+n[º°\\]*\s*([^\s,]+)[^]*?resolve:\s*([^\n\r.]+)/i) ||
+                            texto.match(/Portaria\s+n[º°\\]*\s*([^\s,]+)/i);
+      if (portariaMatch && portariaMatch[1]) {
+        pautas.push({
+          id_temp: `pauta_${Date.now()}_2`,
+          titulo: `ATO DO EXECUTIVO: Portaria nº ${portariaMatch[1]}`,
+          resumo_ia: `Determinação administrativa oficial da Secretaria de Governança estabelecendo diretrizes para os órgãos públicos de ${municipioEfetivo}.`,
+          impacto_bairro: `Regulamentação e diretrizes dos serviços públicos municipais prestados à população.`,
+          vereador_proponente: `Secretaria de Governança - ${municipioEfetivo}`,
+          bairro_alvo: 'Geral / Toda a Cidade',
+          cidade_alvo: municipioEfetivo,
+          estado_alvo: estado,
+          relevancia_score: 75,
+          tags: ['governança', 'atos-oficiais', 'gestão'],
+          categoria: 'governanca',
+        });
+      }
+
+      // 3. Meio Ambiente / Saneamento / Recursos Hídricos
+      if (lower.includes('ambiental') || lower.includes('manancial') || lower.includes('resíduos') || lower.includes('saneamento')) {
+        pautas.push({
+          id_temp: `pauta_${Date.now()}_3`,
+          titulo: `MEIO AMBIENTE: Diretrizes Ambientais e Recursos Hídricos`,
+          resumo_ia: `Publicação de normas e cooperação com a Agência Ambiental para preservação de bacias e áreas de mananciais em ${municipioEfetivo}.`,
+          impacto_bairro: `Proteção das áreas verdes e mananciais hídricos na região da Zona Norte e distritos.`,
+          vereador_proponente: `Consórcio Público Agência Ambiental do Vale do Paraíba`,
+          bairro_alvo: 'Santana',
+          cidade_alvo: municipioEfetivo,
+          estado_alvo: estado,
+          relevancia_score: 80,
+          tags: ['meio-ambiente', 'sustentabilidade', 'saneamento'],
+          categoria: 'obras',
+        });
+      }
+
+      // 4. Obras Viárias, Drenagem ou Pavimentação
+      if (lower.includes('obra') || lower.includes('asfalto') || lower.includes('drenagem') || lower.includes('recape')) {
+        pautas.push({
+          id_temp: `pauta_${Date.now()}_4`,
+          titulo: `ALERTA DE OBRAS: Drenagem e Pavimentação Asfáltica`,
+          resumo_ia: `Abertura de edital de obras públicas para recapeamento asfáltico, contenção pluvial e intervenções viárias no município.`,
+          impacto_bairro: `Intervenções na malha viária e melhorias de drenagem para prevenção de alagamentos.`,
+          vereador_proponente: `Secretaria de Obras e Serviços Municipais - ${municipioEfetivo}`,
+          bairro_alvo: bairro_sugerido || 'Bosque dos Eucaliptos',
+          cidade_alvo: municipioEfetivo,
+          estado_alvo: estado,
+          relevancia_score: 88,
+          tags: ['obras', 'infraestrutura', 'asfalto'],
+          categoria: 'obras',
+        });
+      }
+
+      // 5. Transporte ou Mobilidade
+      if (lower.includes('transporte') || lower.includes('ônibus') || lower.includes('tarifa') || lower.includes('itinerário')) {
+        pautas.push({
+          id_temp: `pauta_${Date.now()}_5`,
+          titulo: `TRANSPORTE PÚBLICO: Mobilidade e Linhas de Ônibus`,
+          resumo_ia: `Ato oficial regulamentando horários, atendimento e diretrizes para os usuários do transporte público municipal.`,
+          impacto_bairro: `Alterações de rotas e atendimento das linhas alimentadoras de bairros.`,
+          vereador_proponente: `Secretaria de Mobilidade Urbana - ${municipioEfetivo}`,
+          bairro_alvo: 'Urbanova',
+          cidade_alvo: municipioEfetivo,
+          estado_alvo: estado,
+          relevancia_score: 84,
+          tags: ['transporte', 'mobilidade'],
+          categoria: 'transporte',
+        });
+      }
+
+      // Se nenhum dos blocos acima bateu, gera 1 pauta geral padrão
+      if (pautas.length === 0) {
+        const linhas = texto.split('\n').filter((l) => l.trim().length > 15);
+        const primeiraLinha = linhas[0] || texto.slice(0, 150);
+        pautas.push({
+          id_temp: `pauta_${Date.now()}_0`,
+          titulo: `ALERTA CIDADÃO: Legislação e Serviços`,
+          resumo_ia: `Publicação oficial no Diário Municipal de ${municipioEfetivo}: ${primeiraLinha.slice(0, 120)}`,
+          impacto_bairro: `Mudanças nas diretrizes municipais com impacto direto na população de ${municipioEfetivo}.`,
+          vereador_proponente: `Prefeitura Municipal de ${municipioEfetivo}`,
+          bairro_alvo: bairro_sugerido || 'Centro',
+          cidade_alvo: municipioEfetivo,
+          estado_alvo: estado,
+          relevancia_score: 80,
+          tags: ['legislação', 'serviços'],
+          categoria: 'geral',
+        });
+      }
+
+      return pautas;
     };
 
-    const pautaHeuristica = extrairInfo(textoEfetivo);
+    const pautasHeuristicas = extrairMultiplasPautas(textoEfetivo);
 
     return NextResponse.json({
       success: true,
       source: 'heuristic-engine-fallback',
       is_real_ai: false,
-      pauta: pautaHeuristica,
+      total_pautas: pautasHeuristicas.length,
+      pautas: pautasHeuristicas,
+      pauta: pautasHeuristicas[0],
       prompt_used: effectivePrompt,
       note: apiKey
         ? 'Chave configurada, mas respondeu com motor de contingência.'
