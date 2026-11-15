@@ -1,11 +1,12 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
+import { Megaphone, Camera, Sparkles, MapPin } from 'lucide-react';
 import { FeedLevel } from '@/types/feed';
-import { PautaIACard } from './PautaIACard';
 import { PostComunidadeCard } from './PostComunidadeCard';
 import { CidadeEsperaView } from './CidadeEsperaView';
-import { usePautas, usePosts, useCidadeStatus } from '@/hooks/useFeedReal';
+import { usePosts, useCidadeStatus } from '@/hooks/useFeedReal';
 import { useAuthStore } from '@/stores/authStore';
 
 interface FeedListProps {
@@ -22,12 +23,7 @@ export const FeedList: React.FC<FeedListProps> = ({ feedLevel, onSwitchTab }) =>
   // Verifica se a cidade do usuário está liberada (ativa) ou em espera
   const { data: cidadeStatus, isLoading: loadingStatus } = useCidadeStatus(userCidade, userEstado);
 
-  // Busca pautas e posts reais
-  const { data: pautas = [], isLoading: loadingPautas, isError: errorPautas } = usePautas(
-    feedLevel,
-    userCidade,
-    userBairro
-  );
+  // Busca apenas postagens reais da comunidade de moradores
   const { data: posts = [], isLoading: loadingPosts, isError: errorPosts } = usePosts(
     feedLevel,
     userCidade,
@@ -49,16 +45,16 @@ export const FeedList: React.FC<FeedListProps> = ({ feedLevel, onSwitchTab }) =>
     );
   }
 
-  if (loadingPautas || loadingPosts) {
+  if (loadingPosts) {
     return (
       <div className="w-full max-w-md mx-auto py-16 flex flex-col items-center justify-center space-y-3 text-gray-500">
         <div className="w-6 h-6 border-2 border-crimson-600 border-t-transparent rounded-full animate-spin" />
-        <span className="text-xs font-semibold text-gray-600">Carregando feed de {userCidade}...</span>
+        <span className="text-xs font-semibold text-gray-600">Carregando relatos dos moradores de {userCidade}...</span>
       </div>
     );
   }
 
-  if (errorPautas && errorPosts) {
+  if (errorPosts) {
     return (
       <div className="w-full max-w-md mx-auto py-16 px-4 text-center">
         <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-amber-800 text-xs space-y-1">
@@ -71,19 +67,42 @@ export const FeedList: React.FC<FeedListProps> = ({ feedLevel, onSwitchTab }) =>
 
   return (
     <div className="w-full max-w-md mx-auto divide-y divide-gray-100 bg-white min-h-screen">
-      {/* 1. Cards de Pauta com IA */}
-      {pautas.map((pauta) => (
-        <PautaIACard key={pauta.id} pauta={pauta} />
-      ))}
+      {/* Banner Informativo Cívico (Redirecionando Decisões da Câmara para Ações) */}
+      <div className="p-3 bg-crimson-50/70 border-b border-crimson-100 flex items-center justify-between text-xs">
+        <div className="flex items-center space-x-2 text-crimson-900 font-medium">
+          <Megaphone className="w-4 h-4 text-crimson-600 shrink-0" />
+          <span>Quer votar nas leis e contratos da Câmara?</span>
+        </div>
+        <Link
+          href="/acoes"
+          className="font-bold text-crimson-700 hover:text-crimson-800 hover:underline shrink-0 text-xs flex items-center gap-1"
+        >
+          Ir para Ações →
+        </Link>
+      </div>
 
-      {/* 2. Posts da Comunidade */}
+      {/* Posts da Comunidade de Moradores */}
       {posts.map((post) => (
         <PostComunidadeCard key={post.id} post={post} />
       ))}
 
-      {pautas.length === 0 && posts.length === 0 && (
-        <div className="p-8 text-center text-xs text-gray-400">
-          Nenhuma pauta ou postagem encontrada para este nível territorial.
+      {posts.length === 0 && (
+        <div className="p-8 text-center space-y-4">
+          <div className="w-12 h-12 mx-auto rounded-full bg-zinc-100 flex items-center justify-center text-zinc-400">
+            <Camera className="w-6 h-6" />
+          </div>
+          <div>
+            <h4 className="text-sm font-bold text-zinc-900">Mural do Bairro sem postagens</h4>
+            <p className="text-xs text-zinc-500 mt-1 max-w-xs mx-auto">
+              Seja o primeiro a fiscalizar! Use o botão vermelho &ldquo;Cobrar&rdquo; para registrar buracos, iluminação ou zeladoria urbana.
+            </p>
+          </div>
+          <Link
+            href="/postar"
+            className="inline-flex items-center justify-center rounded-full bg-crimson-600 px-5 py-2.5 text-xs font-bold text-white shadow-crimson-btn hover:bg-crimson-700 transition-colors"
+          >
+            Cobrar Zeladoria Agora
+          </Link>
         </div>
       )}
     </div>

@@ -114,7 +114,7 @@ export const PautaIACard: React.FC<PautaIACardProps> = ({ pauta }) => {
 
         {/* Legenda de Consenso */}
         <p className="text-[10.5px] text-zinc-500 text-center mb-3 font-medium">
-          Seu voto ajuda a gerar uma petição oficial de pressão na Câmara.
+          Concordar registra aprovação do governo. Discordar soma assinatura para abrir abaixo-assinado com 50 votos.
         </p>
 
         {/* Placar Cívico em Tempo Real (ativado após o voto) */}
@@ -123,14 +123,14 @@ export const PautaIACard: React.FC<PautaIACardProps> = ({ pauta }) => {
             <div className="flex items-center justify-between text-xs font-bold">
               <span className="flex items-center gap-1.5 text-crimson-600">
                 <CheckCircle2 className="w-4 h-4" />
-                Você votou {userVote === 'concordar' ? 'a favor' : 'contra'}
+                Você votou {userVote === 'concordar' ? 'a favor (Apoio)' : 'contra (Assinatura de Pressão)'}
               </span>
-              <span className="text-zinc-500 font-semibold">{totalVotos} cidadãos participaram</span>
+              <span className="text-zinc-500 font-semibold">{totalVotos} cidadãos votaram</span>
             </div>
 
             {userMotivo && (
               <p className="text-[11px] text-zinc-600 bg-white p-2 rounded-xl border border-zinc-200/70 italic">
-                &ldquo;{userMotivo}&rdquo;
+                Motivo da discordância: &ldquo;{userMotivo}&rdquo;
               </p>
             )}
 
@@ -148,15 +148,23 @@ export const PautaIACard: React.FC<PautaIACardProps> = ({ pauta }) => {
 
             <div className="flex justify-between text-[11px] font-semibold">
               <span className="text-crimson-700">{pctConcordar}% concordam ({concordarCount})</span>
-              <span className="text-zinc-800">{pctDiscordar}% discordam ({discordarCount})</span>
+              <span className="text-zinc-800">{pctDiscordar}% discordam ({discordarCount}/50)</span>
             </div>
 
-            {atingiuQuorum && (
-              <div className="mt-1 pt-1.5 border-t border-zinc-200 flex items-center justify-between text-[11px] font-bold text-crimson-800">
-                <span>🚨 Quórum cívico atingido! Abaixo-assinado gerado.</span>
-                <Link href="/acoes" className="underline hover:text-crimson-900">
-                  Ver em Ações →
-                </Link>
+            {atingiuQuorum ? (
+              <div className="mt-1 pt-2 border-t border-zinc-200 text-[11px] font-bold text-crimson-800 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span>🚨 Quórum atingido (+50 discordâncias)!</span>
+                  <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px]">Em revisão no Admin</span>
+                </div>
+                <p className="text-[10px] text-zinc-500 font-normal">
+                  A IA gerou a minuta formal a partir dos argumentos dos moradores. Assim que aprovada pelo administrador, será enviada ao responsável e publicada na aba de Petições.
+                </p>
+              </div>
+            ) : (
+              <div className="mt-1 pt-1.5 border-t border-zinc-200 text-[10.5px] text-zinc-500 flex justify-between">
+                <span>Faltam {Math.max(0, 50 - discordarCount)} discordâncias para virar petição oficial</span>
+                <span className="font-semibold text-zinc-700">Meta: 50</span>
               </div>
             )}
           </div>

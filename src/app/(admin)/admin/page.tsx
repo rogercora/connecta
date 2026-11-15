@@ -31,6 +31,9 @@ import {
   MapPin,
   FileCode,
   Tag,
+  Mail,
+  SendHorizontal,
+  Stamp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -38,8 +41,65 @@ import { PautaIASummarized, SYSTEM_SUMMARIZER_PROMPT } from '@/prompts/summarize
 import { PautaIA } from '@/types/database';
 import { EdicaoSJC } from '@/app/api/diario/sjc/route';
 
+export interface PeticaoModeracao {
+  id: string;
+  titulo: string;
+  bairro: string;
+  cidade: string;
+  totalDiscordancias: number;
+  quorumMinimo: number;
+  vereadorAlvo: string;
+  emailAlvo: string;
+  argumentosMoradores: string[];
+  minutaIA: string;
+  status: 'pendente_revisao' | 'aprovada_enviada' | 'rejeitada';
+  dataQuorum: string;
+  simulouEnvio?: boolean;
+}
+
+const PETICOES_MODERACAO_INICIAIS: PeticaoModeracao[] = [
+  {
+    id: 'pet-mod-1',
+    titulo: 'Petição Popular contra o Fechamento de Faixas de Trânsito na Av. Cassiano Ricardo',
+    bairro: 'Jardim Aquárius',
+    cidade: 'São José dos Campos',
+    totalDiscordancias: 64,
+    quorumMinimo: 50,
+    vereadorAlvo: 'Marcio Roberto (Câmara Municipal)',
+    emailAlvo: 'gabinete.marcioroberto@camarasjc.sp.gov.br',
+    argumentosMoradores: [
+      'Gargalo severo no horário de pico entre 17h30 e 19h30.',
+      'Falta de estudo prévio de impacto de tráfego apresentado aos moradores.',
+      'Dificuldade de acesso para viaturas de resgate e ambulâncias.',
+    ],
+    minutaIA: 'Os abaixo-assinados, cidadãos residentes no Jardim Aquárius, com esteio no art. 5º, XXXIV da CF, requerem a imediata suspensão da alteração viária e a realização de audiência pública com a comunidade.',
+    status: 'pendente_revisao',
+    dataQuorum: 'Hoje às 14:20',
+  },
+  {
+    id: 'pet-mod-2',
+    titulo: 'Impugnação ao Edital de Cobrança Extraordinária de Coleta de Resíduos Noturnos',
+    bairro: 'Centro',
+    cidade: 'São José dos Campos',
+    totalDiscordancias: 82,
+    quorumMinimo: 50,
+    vereadorAlvo: 'Secretaria de Gestão Administrativa e Finanças',
+    emailAlvo: 'financas@sjc.sp.gov.br',
+    argumentosMoradores: [
+      'Bitributação indevida pois o IPTU já recolhe taxas de conservação urbana.',
+      'Ausência de diálogo com o comércio e moradores da área central.',
+    ],
+    minutaIA: 'Requer-se a revogação do edital e a demonstração contábil do rateio dos custos de coleta noturna, sob pena de representação junto ao Tribunal de Contas do Estado.',
+    status: 'pendente_revisao',
+    dataQuorum: 'Ontem às 21:05',
+  },
+];
+
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<'diario_api' | 'manual_upload' | 'publicadas' | 'config'>('diario_api');
+  const [activeTab, setActiveTab] = useState<'diario_api' | 'manual_upload' | 'publicadas' | 'peticoes_mod' | 'config'>('diario_api');
+
+  // Estado da Fila de Moderação de Petições Cívicas (Quórum Atingido)
+  const [peticoesFila, setPeticoesFila] = useState<PeticaoModeracao[]>(PETICOES_MODERACAO_INICIAIS);
 
   // Estado da API do Diário Oficial de SJC
   const [edicoesSJC, setEdicoesSJC] = useState<EdicaoSJC[]>([]);
@@ -636,6 +696,23 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
         </button>
 
         <button
+          onClick={() => setActiveTab('peticoes_mod')}
+          className={`py-3 px-2 sm:px-4 text-xs sm:text-sm font-black border-b-2 flex items-center space-x-2 transition-all whitespace-nowrap ${
+            activeTab === 'peticoes_mod'
+              ? 'border-crimson-600 text-crimson-800'
+              : 'border-transparent text-gray-500 hover:text-gray-900'
+          }`}
+        >
+          <Stamp className="w-4 h-4 text-crimson-600" />
+          <span>4. Moderação de Petições</span>
+          {peticoesFila.filter((p) => p.status === 'pendente_revisao').length > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full bg-crimson-600 text-white text-[10px] font-black">
+              {peticoesFila.filter((p) => p.status === 'pendente_revisao').length}
+            </span>
+          )}
+        </button>
+
+        <button
           onClick={() => setActiveTab('config')}
           className={`py-3 px-2 sm:px-4 text-xs sm:text-sm font-black border-b-2 flex items-center space-x-2 transition-all whitespace-nowrap ${
             activeTab === 'config'
@@ -644,7 +721,7 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
           }`}
         >
           <Sliders className="w-4 h-4" />
-          <span>4. Chave IA & Prompts</span>
+          <span>5. Chave IA & Prompts</span>
         </button>
       </div>
 
@@ -1312,7 +1389,247 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
       )}
 
       {/* ======================================================== */}
-      {/* ABA 4: CHAVE DA IA & PROMPTS                             */}
+      {/* ABA 4: MODERAÇÃO DE PETIÇÕES (QUÓRUM ATINGIDO)           */}
+      {/* ======================================================== */}
+      {activeTab === 'peticoes_mod' && (
+        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-gray-100">
+            <div>
+              <div className="flex items-center space-x-2">
+                <Stamp className="w-5 h-5 text-crimson-600" />
+                <h3 className="text-sm font-black text-gray-900">
+                  Fila de Moderação de Petições Cívicas (Quórum Atingido)
+                </h3>
+              </div>
+              <p className="text-xs text-gray-500 mt-1 max-w-2xl leading-relaxed">
+                Quando uma matéria da Câmara acumula <strong>50 discordâncias</strong> de moradores, a IA compila os argumentos e redige a minuta. O administrador humano revisa, corrige e aprova antes de disparar aos órgãos públicos.
+              </p>
+            </div>
+
+            <span className="text-[11px] font-bold px-3 py-1 bg-crimson-50 text-crimson-800 rounded-full border border-crimson-200 self-start sm:self-auto">
+              {peticoesFila.filter((p) => p.status === 'pendente_revisao').length} aguardando revisão
+            </span>
+          </div>
+
+          <div className="space-y-5">
+            {peticoesFila.map((peticao) => {
+              const isPendente = peticao.status === 'pendente_revisao';
+              const isAprovada = peticao.status === 'aprovada_enviada';
+
+              return (
+                <div
+                  key={peticao.id}
+                  className={`border rounded-2xl p-4 sm:p-5 space-y-4 transition-all ${
+                    isPendente
+                      ? 'border-amber-300 bg-amber-50/20 shadow-xs'
+                      : isAprovada
+                      ? 'border-crimson-300 bg-crimson-50/10'
+                      : 'border-gray-200 opacity-60'
+                  }`}
+                >
+                  {/* Top Bar da Petição */}
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center space-x-2">
+                      <span
+                        className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full border ${
+                          isPendente
+                            ? 'bg-amber-100 text-amber-900 border-amber-300'
+                            : isAprovada
+                            ? 'bg-crimson-100 text-crimson-800 border-crimson-300'
+                            : 'bg-gray-100 text-gray-700 border-gray-200'
+                        }`}
+                      >
+                        {isPendente
+                          ? '⏳ Aguardando Curadoria Humana'
+                          : isAprovada
+                          ? '✅ Aprovada & Publicada em Ações'
+                          : '📁 Arquivada'}
+                      </span>
+
+                      <span className="text-xs font-bold text-gray-700">
+                        {peticao.bairro} • {peticao.cidade}
+                      </span>
+                    </div>
+
+                    <span className="text-[11px] font-mono text-gray-400">
+                      Quórum batido: {peticao.dataQuorum}
+                    </span>
+                  </div>
+
+                  {/* Título da Causa */}
+                  <div>
+                    <h4 className="text-sm font-extrabold text-gray-900 leading-snug">
+                      {peticao.titulo}
+                    </h4>
+                    <p className="text-xs text-crimson-700 font-bold mt-0.5">
+                      Alvo: {peticao.vereadorAlvo}
+                    </p>
+                  </div>
+
+                  {/* Dados de Quórum */}
+                  <div className="p-3 bg-white rounded-xl border border-gray-200 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                    <div>
+                      <span className="text-gray-400 block text-[10px] font-semibold">Assinaturas de Oposição:</span>
+                      <strong className="text-crimson-700 font-black text-sm">
+                        {peticao.totalDiscordancias} cidadãos
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block text-[10px] font-semibold">Meta de Quórum:</span>
+                      <strong className="text-gray-900 font-bold text-sm">
+                        {peticao.quorumMinimo} votos (Atingido!)
+                      </strong>
+                    </div>
+                    <div className="col-span-2 sm:col-span-1">
+                      <span className="text-gray-400 block text-[10px] font-semibold">Fundamentação:</span>
+                      <strong className="text-gray-700 font-bold text-xs">
+                        Art. 5º, XXXIV CF
+                      </strong>
+                    </div>
+                  </div>
+
+                  {/* Argumentos dos Moradores */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-gray-800 block">
+                      Motivos reais informados pelos moradores na votação:
+                    </label>
+                    <ul className="list-disc list-inside space-y-1 text-xs text-gray-600 bg-white p-3 rounded-xl border border-gray-200">
+                      {peticao.argumentosMoradores.map((arg, idx) => (
+                        <li key={idx} className="leading-relaxed">
+                          &ldquo;{arg}&rdquo;
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Minuta Formal da IA (Editável pelo Administrador) */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-gray-800 flex items-center space-x-1">
+                        <FileText className="w-4 h-4 text-crimson-600" />
+                        <span>Minuta Formal do Abaixo-Assinado (Editável pelo Administrador):</span>
+                      </label>
+                      <span className="text-[10px] text-gray-400">Pode ajustar o texto livremente</span>
+                    </div>
+                    <textarea
+                      rows={3}
+                      value={peticao.minutaIA}
+                      disabled={!isPendente}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setPeticoesFila((prev) =>
+                          prev.map((p) => (p.id === peticao.id ? { ...p, minutaIA: val } : p))
+                        );
+                      }}
+                      className="w-full p-3 bg-white border border-gray-200 rounded-xl text-xs font-sans text-gray-800 focus:ring-2 focus:ring-crimson-600 focus:outline-none leading-relaxed"
+                    />
+                  </div>
+
+                  {/* E-mail de Destino do Órgão / Vereador */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-700 block">
+                        E-mail oficial para envio protocolar:
+                      </label>
+                      <div className="relative">
+                        <Mail className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="email"
+                          value={peticao.emailAlvo}
+                          disabled={!isPendente}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setPeticoesFila((prev) =>
+                              prev.map((p) => (p.id === peticao.id ? { ...p, emailAlvo: val } : p))
+                            );
+                          }}
+                          className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-mono text-gray-800 focus:ring-2 focus:ring-crimson-600 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Botões de Ação do Administrador */}
+                    <div className="flex items-end space-x-2 pt-1">
+                      {isPendente ? (
+                        <>
+                          <button
+                            onClick={() => {
+                              setPeticoesFila((prev) =>
+                                prev.map((p) =>
+                                  p.id === peticao.id ? { ...p, status: 'aprovada_enviada' } : p
+                                )
+                              );
+                              setPublishSuccess(
+                                `✅ Petição "${peticao.titulo}" foi APROVADA e publicada com sucesso na aba de Petições!`
+                              );
+                            }}
+                            className="flex-1 py-2 px-3 bg-crimson-600 hover:bg-crimson-700 text-white rounded-xl text-xs font-bold flex items-center justify-center space-x-1 shadow-crimson-btn transition-transform active:scale-95 cursor-pointer"
+                          >
+                            <Check className="w-4 h-4 stroke-[3]" />
+                            <span>Aprovar Petição</span>
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              if (confirm('Deseja arquivar esta petição?')) {
+                                setPeticoesFila((prev) =>
+                                  prev.map((p) =>
+                                    p.id === peticao.id ? { ...p, status: 'rejeitada' } : p
+                                  )
+                                );
+                              }
+                            }}
+                            className="py-2 px-3 border border-gray-200 hover:bg-gray-100 text-gray-600 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                          >
+                            Arquivar
+                          </button>
+                        </>
+                      ) : (
+                        <div className="flex items-center space-x-2 w-full">
+                          <button
+                            onClick={() => {
+                              setPeticoesFila((prev) =>
+                                prev.map((p) =>
+                                  p.id === peticao.id ? { ...p, simulouEnvio: true } : p
+                                )
+                              );
+                              alert(
+                                `📧 Petição e lista de ${peticao.totalDiscordancias} assinaturas auditadas enviada com sucesso para ${peticao.emailAlvo} sob Protocolo Digital CBR-${Date.now().toString().slice(-6)}!`
+                              );
+                            }}
+                            className="flex-1 py-2 px-3 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
+                          >
+                            <SendHorizontal className="w-3.5 h-3.5" />
+                            <span>
+                              {peticao.simulouEnvio ? 'Reenviar E-mail Protocolar' : 'Disparar E-mail ao Gabinete'}
+                            </span>
+                          </button>
+
+                          <Link
+                            href="/acoes"
+                            className="py-2 px-3 border border-crimson-200 bg-crimson-50 text-crimson-800 hover:bg-crimson-100 rounded-xl text-xs font-bold transition-colors"
+                          >
+                            Ver em Ações →
+                          </Link>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {peticoesFila.length === 0 && (
+              <div className="py-12 text-center text-xs text-gray-400">
+                Nenhuma petição com quórum aguardando moderação.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* ABA 5: CHAVE DA IA & PROMPTS                             */}
       {/* ======================================================== */}
       {activeTab === 'config' && (
         <form onSubmit={handleSaveConfig} className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-5">
