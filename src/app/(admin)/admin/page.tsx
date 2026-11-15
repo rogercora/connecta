@@ -81,6 +81,10 @@ export default function AdminPage() {
   const [loadingPautas, setLoadingPautas] = useState(false);
   const [cidadeFiltro, setCidadeFiltro] = useState('todas');
 
+  // Estado do Cron Noturno Automatizado
+  const [executingCron, setExecutingCron] = useState(false);
+  const [cronResult, setCronResult] = useState<any>(null);
+
   // Carrega chave salva
   useEffect(() => {
     const savedKey = localStorage.getItem('connecta_gemini_api_key');
@@ -459,6 +463,24 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
     }
   };
 
+  // Disparo manual do Cron Noturno para teste
+  const handleExecutarCron = async () => {
+    setExecutingCron(true);
+    setCronResult(null);
+    try {
+      const res = await fetch('/api/cron/diario-sjc', { method: 'POST' });
+      const data = await res.json();
+      setCronResult(data);
+      if (data.success) {
+        carregarPautas();
+      }
+    } catch (err: any) {
+      alert('Erro ao executar cron: ' + err.message);
+    } finally {
+      setExecutingCron(false);
+    }
+  };
+
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       {/* Top Banner */}
@@ -513,6 +535,64 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
               </button>
               .
             </span>
+          </div>
+        </div>
+      )}
+
+      {/* Banner de Automação Noturna (Cron Diário Oficial) */}
+      <div className="bg-gradient-to-r from-zinc-900 to-zinc-950 text-white rounded-2xl p-4 sm:p-5 shadow-sm border border-zinc-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center space-x-2">
+            <span className="w-6 h-6 rounded-lg bg-crimson-600 flex items-center justify-center text-xs font-bold shadow-crimson-btn">
+              ⚡
+            </span>
+            <h3 className="text-sm font-black text-white tracking-tight">
+              Automação Noturna (Vercel Cron • Diário Oficial SJC)
+            </h3>
+            <span className="text-[10px] bg-crimson-950 text-crimson-300 border border-crimson-800 font-bold px-2 py-0.5 rounded-full">
+              Ativo às 02:00 BRT
+            </span>
+          </div>
+          <p className="text-xs text-zinc-400 max-w-xl leading-relaxed">
+            Todas as madrugadas, a IA busca novas edições no portal da prefeitura de São José dos Campos, extrai decretos e obras por bairro e publica no feed do cidadão.
+          </p>
+        </div>
+
+        <div className="flex items-center space-x-2 shrink-0">
+          <Button
+            variant="primary"
+            onClick={handleExecutarCron}
+            isLoading={executingCron}
+            className="text-xs font-bold py-2.5 px-4 rounded-xl bg-crimson-600 hover:bg-crimson-700 text-white shadow-crimson-btn flex items-center space-x-1.5"
+          >
+            <span>Executar Agora (Teste Manual)</span>
+          </Button>
+        </div>
+      </div>
+
+      {/* Relatório de Execução do Cron (se disparado) */}
+      {cronResult && (
+        <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-2xl space-y-2 animate-fadeIn text-xs">
+          <div className="flex items-center justify-between font-bold text-zinc-900">
+            <span className="flex items-center gap-1.5 text-crimson-700">
+              <CheckCircle2 className="w-4 h-4 text-crimson-600" />
+              Rotina Noturna Executada com Sucesso!
+            </span>
+            <span className="text-zinc-500 text-[11px] font-mono">{cronResult.timestamp}</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1 text-[11px]">
+            <div className="p-2.5 bg-white rounded-xl border border-zinc-200">
+              <span className="text-zinc-400 block font-semibold">Edição de SJC:</span>
+              <strong className="text-zinc-900 font-bold">Ed. #{cronResult.edicao_numero}</strong>
+            </div>
+            <div className="p-2.5 bg-white rounded-xl border border-zinc-200">
+              <span className="text-zinc-400 block font-semibold">Novas Pautas Mineradas:</span>
+              <strong className="text-crimson-700 font-black">+{cronResult.novas_pautas_publicadas} matérias</strong>
+            </div>
+            <div className="p-2.5 bg-white rounded-xl border border-zinc-200 col-span-2 sm:col-span-1">
+              <span className="text-zinc-400 block font-semibold">Origem:</span>
+              <strong className="text-zinc-900">{cronResult.origem}</strong>
+            </div>
           </div>
         </div>
       )}

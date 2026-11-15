@@ -1,0 +1,9 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/diario-sjc",
+      "schedule": "0 5 * * *"
+    }
+  ]
+}
+
