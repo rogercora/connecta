@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { MoreHorizontal, FileText, Check, X, ChevronDown, Megaphone, Sparkles } from 'lucide-react';
+import Link from 'next/link';
+import { MoreHorizontal, FileText, Check, X, ChevronDown, Megaphone, Sparkles, CheckCircle2 } from 'lucide-react';
 import { PautaIA } from '@/types/database';
 import { DiscordarModal } from '@/components/votacao/DiscordarModal';
 import { useVoto } from '@/hooks/useVoto';
@@ -13,7 +14,16 @@ interface PautaIACardProps {
 export const PautaIACard: React.FC<PautaIACardProps> = ({ pauta }) => {
   const [modalOpen, setModalOpen] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
-  const { hasVoted, userVote, submitVote } = useVoto(pauta.id);
+
+  const {
+    hasVoted,
+    userVote,
+    userMotivo,
+    concordarCount,
+    discordarCount,
+    totalVotos,
+    submitVote,
+  } = useVoto(pauta.id, pauta.votos_concordar || 0, pauta.votos_discordar || 0);
 
   const handleConcordar = () => {
     submitVote('concordar');
@@ -22,6 +32,10 @@ export const PautaIACard: React.FC<PautaIACardProps> = ({ pauta }) => {
   const handleDiscordarSubmit = (motivo: string) => {
     submitVote('discordar', motivo);
   };
+
+  const pctConcordar = totalVotos > 0 ? Math.round((concordarCount / totalVotos) * 100) : 50;
+  const pctDiscordar = totalVotos > 0 ? 100 - pctConcordar : 50;
+  const atingiuQuorum = discordarCount >= 50 || concordarCount >= 50;
 
   return (
     <>
@@ -102,6 +116,51 @@ export const PautaIACard: React.FC<PautaIACardProps> = ({ pauta }) => {
         <p className="text-[10.5px] text-zinc-500 text-center mb-3 font-medium">
           Seu voto ajuda a gerar uma petição oficial de pressão na Câmara.
         </p>
+
+        {/* Placar Cívico em Tempo Real (ativado após o voto) */}
+        {hasVoted && (
+          <div className="mb-3.5 p-3.5 bg-zinc-50 border border-zinc-200/90 rounded-2xl space-y-2.5 animate-fadeIn">
+            <div className="flex items-center justify-between text-xs font-bold">
+              <span className="flex items-center gap-1.5 text-crimson-600">
+                <CheckCircle2 className="w-4 h-4" />
+                Você votou {userVote === 'concordar' ? 'a favor' : 'contra'}
+              </span>
+              <span className="text-zinc-500 font-semibold">{totalVotos} cidadãos participaram</span>
+            </div>
+
+            {userMotivo && (
+              <p className="text-[11px] text-zinc-600 bg-white p-2 rounded-xl border border-zinc-200/70 italic">
+                &ldquo;{userMotivo}&rdquo;
+              </p>
+            )}
+
+            {/* Barra de Consenso da Comunidade */}
+            <div className="w-full bg-zinc-200 h-2.5 rounded-full overflow-hidden flex">
+              <div
+                className="bg-crimson-600 h-full transition-all duration-700"
+                style={{ width: `${pctConcordar}%` }}
+              />
+              <div
+                className="bg-zinc-800 h-full transition-all duration-700"
+                style={{ width: `${pctDiscordar}%` }}
+              />
+            </div>
+
+            <div className="flex justify-between text-[11px] font-semibold">
+              <span className="text-crimson-700">{pctConcordar}% concordam ({concordarCount})</span>
+              <span className="text-zinc-800">{pctDiscordar}% discordam ({discordarCount})</span>
+            </div>
+
+            {atingiuQuorum && (
+              <div className="mt-1 pt-1.5 border-t border-zinc-200 flex items-center justify-between text-[11px] font-bold text-crimson-800">
+                <span>🚨 Quórum cívico atingido! Abaixo-assinado gerado.</span>
+                <Link href="/acoes" className="underline hover:text-crimson-900">
+                  Ver em Ações →
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Ver Diário Oficial Original */}
         <div className="flex items-center space-x-2 pt-0.5">
