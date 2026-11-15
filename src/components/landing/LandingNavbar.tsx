@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Menu, X, MapPin } from 'lucide-react';
+import { Menu, X, MapPin, Sparkles, HeartHandshake } from 'lucide-react';
 
 interface LandingNavbarProps {
   onFocusCep: () => void;
@@ -11,20 +11,11 @@ interface LandingNavbarProps {
 
 export const ConnectaLogo: React.FC<{ className?: string }> = ({ className = '' }) => (
   <span className={`inline-flex items-center gap-2.5 ${className}`}>
-    <svg
-      viewBox="0 0 32 32"
-      className="h-8 w-8 shrink-0"
-      aria-hidden="true"
-      fill="none"
-    >
-      <rect width="32" height="32" rx="9" fill="#18181B" />
-      <path d="M10 21.5 16 10l6 11.5H10Z" stroke="#F4F5F7" strokeWidth="1.6" strokeLinejoin="round" />
-      <circle cx="16" cy="10" r="3" fill="#F97316" />
-      <circle cx="10" cy="21.5" r="3" fill="#0284C7" />
-      <circle cx="22" cy="21.5" r="3" fill="#10B981" />
-    </svg>
-    <span className="font-display text-lg font-extrabold leading-none tracking-tight text-zinc-900">
-      Connecta <span className="text-orange-600">Brasil</span>
+    <span className="relative flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-terracotta-500 to-terracotta-600 text-white shadow-sm shadow-terracotta-500/20">
+      <HeartHandshake className="h-5 w-5" />
+    </span>
+    <span className="font-display text-xl font-extrabold tracking-tight text-earth-900">
+      Connecta <span className="text-terracotta-500">Brasil</span>
     </span>
   </span>
 );
@@ -33,9 +24,9 @@ export const LandingNavbar: React.FC<LandingNavbarProps> = ({ onFocusCep, onOpen
   const [open, setOpen] = useState(false);
 
   const links = [
-    { label: 'Processos Ativos', href: '#processos' },
+    { label: 'Causas Ativas', href: '#processos' },
     { label: 'Como Funciona', href: '#como-funciona' },
-    { label: 'Cidades', href: '#cidades' },
+    { label: 'Cidades em Expansão', href: '#cidades' },
   ];
 
   const handleCep = () => {
@@ -49,81 +40,85 @@ export const LandingNavbar: React.FC<LandingNavbarProps> = ({ onFocusCep, onOpen
   };
 
   return (
-    <nav className="border-b border-zinc-200 bg-white/95 backdrop-blur" aria-label="Navegação principal">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        <Link href="/" aria-label="Connecta Brasil — início">
+    <nav className="border-b border-[#EAE3D6] bg-[#FAF7F2]/90 backdrop-blur-md" aria-label="Navegação principal">
+      <div className="mx-auto flex h-18 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8 py-3">
+        <Link href="/" aria-label="Connecta Brasil — início" className="transition-opacity hover:opacity-90">
           <ConnectaLogo />
         </Link>
 
-        <div className="hidden items-center gap-1 lg:flex">
+        {/* Links centrais estilo HopeRise com pílulas suaves */}
+        <div className="hidden items-center gap-1.5 rounded-full border border-[#E7DFD2] bg-white/70 px-3 py-1.5 shadow-xs lg:flex">
           <a
             href={links[0].href}
-            className="rounded-lg px-3 py-2 text-sm font-semibold text-zinc-700 transition-colors hover:bg-[#F4F5F7] hover:text-zinc-900"
+            className="rounded-full px-4 py-1.5 text-sm font-semibold text-earth-700 transition-colors hover:bg-cream-200 hover:text-earth-900"
           >
             {links[0].label}
           </a>
           <button
             type="button"
             onClick={handlePetition}
-            className="rounded-lg px-3 py-2 text-sm font-semibold text-zinc-700 transition-colors hover:bg-[#F4F5F7] hover:text-zinc-900"
+            className="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold text-terracotta-600 transition-colors hover:bg-terracotta-50 hover:text-terracotta-700"
           >
-            Criar Petição
+            <Sparkles className="h-3.5 w-3.5" />
+            Criar Abaixo-Assinado
           </button>
           {links.slice(1).map((link) => (
             <a
               key={link.href}
               href={link.href}
-              className="rounded-lg px-3 py-2 text-sm font-semibold text-zinc-700 transition-colors hover:bg-[#F4F5F7] hover:text-zinc-900"
+              className="rounded-full px-4 py-1.5 text-sm font-semibold text-earth-700 transition-colors hover:bg-cream-200 hover:text-earth-900"
             >
               {link.label}
             </a>
           ))}
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Botão de ação à direita estilo HopeRise Charity */}
+        <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={handleCep}
-            className="hidden items-center gap-2 rounded-lg border-2 border-zinc-900 bg-white px-4 py-2 text-sm font-bold text-zinc-900 transition-colors hover:bg-zinc-900 hover:text-white sm:inline-flex"
+            className="hidden items-center gap-2 rounded-full bg-terracotta-500 px-5 py-2.5 text-sm font-bold text-white shadow-hoperise-btn transition-all hover:bg-terracotta-600 hover:shadow-md active:scale-[0.98] sm:inline-flex"
           >
             <MapPin className="h-4 w-4" />
-            Entrar com meu CEP
+            Verificar meu CEP
           </button>
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-zinc-200 text-zinc-800 lg:hidden"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#E7DFD2] bg-white text-earth-800 transition-colors hover:bg-cream-200 lg:hidden"
             aria-label={open ? 'Fechar menu' : 'Abrir menu'}
             aria-expanded={open}
           >
-            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5 text-earth-700" />}
           </button>
         </div>
       </div>
 
+      {/* Menu mobile */}
       {open && (
-        <div className="border-t border-zinc-200 bg-white px-4 pb-4 pt-2 lg:hidden">
-          <div className="flex flex-col">
+        <div className="border-t border-[#EAE3D6] bg-[#FAF7F2] px-4 pb-5 pt-3 lg:hidden">
+          <div className="flex flex-col gap-1.5">
             <a
               href={links[0].href}
               onClick={() => setOpen(false)}
-              className="rounded-lg px-3 py-3 text-sm font-semibold text-zinc-800 hover:bg-[#F4F5F7]"
+              className="rounded-2xl px-4 py-3 text-sm font-semibold text-earth-800 hover:bg-cream-200"
             >
               {links[0].label}
             </a>
             <button
               type="button"
               onClick={handlePetition}
-              className="rounded-lg px-3 py-3 text-left text-sm font-semibold text-zinc-800 hover:bg-[#F4F5F7]"
+              className="rounded-2xl px-4 py-3 text-left text-sm font-semibold text-terracotta-600 hover:bg-terracotta-50"
             >
-              Criar Petição
+              ✍️ Criar Abaixo-Assinado
             </button>
             {links.slice(1).map((link) => (
               <a
                 key={link.href}
                 href={link.href}
                 onClick={() => setOpen(false)}
-                className="rounded-lg px-3 py-3 text-sm font-semibold text-zinc-800 hover:bg-[#F4F5F7]"
+                className="rounded-2xl px-4 py-3 text-sm font-semibold text-earth-800 hover:bg-cream-200"
               >
                 {link.label}
               </a>
@@ -131,10 +126,10 @@ export const LandingNavbar: React.FC<LandingNavbarProps> = ({ onFocusCep, onOpen
             <button
               type="button"
               onClick={handleCep}
-              className="mt-2 inline-flex items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 py-3 text-sm font-bold text-white"
+              className="mt-2 inline-flex items-center justify-center gap-2 rounded-full bg-terracotta-500 px-5 py-3.5 text-sm font-bold text-white shadow-hoperise-btn hover:bg-terracotta-600"
             >
               <MapPin className="h-4 w-4" />
-              Entrar com meu CEP
+              Verificar meu CEP
             </button>
           </div>
         </div>

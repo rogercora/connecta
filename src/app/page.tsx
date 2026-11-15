@@ -4,6 +4,7 @@ import React, { useCallback, useRef, useState } from 'react';
 import { LiveTicker } from '@/components/landing/LiveTicker';
 import { LandingNavbar } from '@/components/landing/LandingNavbar';
 import { HeroSection } from '@/components/landing/HeroSection';
+import { ImpactStats } from '@/components/landing/ImpactStats';
 import { ProcessesSection } from '@/components/landing/ProcessesSection';
 import { HowItWorksSection } from '@/components/landing/HowItWorksSection';
 import { CitiesRankingSection } from '@/components/landing/CitiesRankingSection';
@@ -47,6 +48,7 @@ export default function HomePage() {
 
       <main>
         <HeroSection cepInputRef={cepInputRef} onOpenPetition={openPetition} />
+        <ImpactStats />
         <ProcessesSection userProcesses={userProcesses} />
         <HowItWorksSection />
         <CitiesRankingSection onFocusCep={handleFocusCep} />

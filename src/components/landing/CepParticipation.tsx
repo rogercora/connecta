@@ -5,11 +5,12 @@ import Link from 'next/link';
 import {
   ArrowRight,
   BadgeCheck,
+  CheckCircle2,
   Loader2,
   MapPin,
   MessageCircle,
   Users,
-  Lock,
+  Sparkles,
 } from 'lucide-react';
 import { formatCEP } from '@/lib/utils/formatters';
 import { useGeolocation } from '@/hooks/useGeolocation';
@@ -24,9 +25,9 @@ type Result =
   | { kind: 'locked'; cep: string; city: string; uf: string; current: number; goal: number };
 
 const LOCAL_PETITIONS = [
-  { title: 'Faixa elevada e semáforo na Av. Andrômeda', supporters: 842 },
-  { title: 'Reforma da praça e iluminação em LED', supporters: 318 },
-  { title: 'Mais linhas de ônibus no horário de pico', supporters: 1204 },
+  { title: 'Faixa elevada e semáforo inteligente na Av. Andrômeda', supporters: 842 },
+  { title: 'Reforma da praça e nova iluminação em LED', supporters: 318 },
+  { title: 'Aumento de ônibus e linhas no horário de pico', supporters: 1204 },
 ];
 
 export const CepParticipation: React.FC<CepParticipationProps> = ({ cepInputRef }) => {
@@ -79,13 +80,21 @@ export const CepParticipation: React.FC<CepParticipationProps> = ({ cepInputRef 
   };
 
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-5">
+    <div className="rounded-3xl border border-[#EAE3D6] bg-white p-5 shadow-hoperise-card sm:p-6 transition-all">
+      <div className="mb-4 flex items-center justify-between">
+        <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-earth-500">
+          <MapPin className="h-3.5 w-3.5 text-terracotta-500" />
+          Acesso Geolocalizado por CEP
+        </span>
+        <span className="text-xs text-earth-400">100% gratuito e seguro</span>
+      </div>
+
       <form onSubmit={handleSubmit} className="flex flex-col gap-3 sm:flex-row">
         <label htmlFor="hero-cep" className="sr-only">
           Seu CEP
         </label>
         <div className="relative flex-1">
-          <MapPin className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-zinc-400" />
+          <MapPin className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-earth-400" />
           <input
             id="hero-cep"
             ref={cepInputRef}
@@ -98,157 +107,195 @@ export const CepParticipation: React.FC<CepParticipationProps> = ({ cepInputRef 
             placeholder="00000-000"
             aria-invalid={!!error}
             aria-describedby={error ? 'hero-cep-error' : undefined}
-            className="h-[52px] w-full rounded-xl border-2 border-zinc-300 bg-white pl-11 pr-4 text-lg font-semibold tracking-wider text-zinc-900 placeholder:font-normal placeholder:text-zinc-400 transition-colors focus:border-sky-600 focus:outline-none focus:ring-4 focus:ring-sky-600/15"
+            className="h-14 w-full rounded-2xl border-2 border-cream-300 bg-cream-50/60 pl-12 pr-4 text-lg font-semibold tracking-wider text-earth-900 placeholder:font-normal placeholder:text-earth-400 transition-colors focus:border-terracotta-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-terracotta-500/15"
           />
         </div>
         <button
           type="submit"
           disabled={loading}
-          className="inline-flex h-[52px] shrink-0 items-center justify-center gap-2 rounded-xl bg-orange-600 px-6 text-base font-bold text-white shadow-sm shadow-orange-600/30 transition-all hover:bg-orange-700 active:scale-[0.98] disabled:opacity-70"
+          className="inline-flex h-14 shrink-0 items-center justify-center gap-2 rounded-2xl bg-terracotta-500 px-7 text-base font-bold text-white shadow-hoperise-btn transition-all hover:bg-terracotta-600 active:scale-[0.98] disabled:opacity-70 cursor-pointer"
         >
           {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
           Participar do meu Bairro
+          <ArrowRight className="h-4 w-4" />
         </button>
       </form>
 
       {error && (
-        <p id="hero-cep-error" className="mt-2 text-sm font-medium text-red-700">
+        <p id="hero-cep-error" className="mt-2.5 text-sm font-medium text-red-600">
           {error}
         </p>
       )}
 
-      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
-        <span>Simular:</span>
+      {/* Atalhos rápidos em pílulas */}
+      <div className="mt-3.5 flex flex-wrap items-center gap-2 text-xs text-earth-500">
+        <span className="font-medium">Testar CEP:</span>
         <button
           type="button"
           onClick={() => quickFill('12230000')}
-          className="rounded-md border border-zinc-200 bg-[#F4F5F7] px-2.5 py-1 font-medium text-zinc-700 hover:border-emerald-500 hover:text-emerald-700"
+          className="rounded-full border border-cream-300 bg-cream-100 px-3 py-1 font-semibold text-earth-700 transition-colors hover:border-terracotta-300 hover:bg-terracotta-50 hover:text-terracotta-700 cursor-pointer"
         >
-          CEP de SJC
+          📍 Jd. Satélite (SJC)
+        </button>
+        <button
+          type="button"
+          onClick={() => quickFill('12243000')}
+          className="rounded-full border border-cream-300 bg-cream-100 px-3 py-1 font-semibold text-earth-700 transition-colors hover:border-terracotta-300 hover:bg-terracotta-50 hover:text-terracotta-700 cursor-pointer"
+        >
+          📍 Vila Ema (SJC)
         </button>
         <button
           type="button"
           onClick={() => quickFill('12308000')}
-          className="rounded-md border border-zinc-200 bg-[#F4F5F7] px-2.5 py-1 font-medium text-zinc-700 hover:border-orange-500 hover:text-orange-700"
+          className="rounded-full border border-cream-300 bg-cream-100 px-3 py-1 font-semibold text-earth-700 transition-colors hover:border-terracotta-300 hover:bg-terracotta-50 hover:text-terracotta-700 cursor-pointer"
         >
-          CEP de Jacareí
+          📍 Jacareí
         </button>
       </div>
 
+      {/* Estado desbloqueado (SJC) estilo HopeRise */}
       {result?.kind === 'unlocked' && (
-        <div className="mt-4 overflow-hidden rounded-xl border-2 border-emerald-500 bg-emerald-50/60">
-          <div className="flex items-center gap-3 border-b border-emerald-200 bg-emerald-50 px-4 py-3">
-            <BadgeCheck className="h-6 w-6 shrink-0 text-emerald-600" />
-            <div className="min-w-0">
-              <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">
-                Bairro desbloqueado
-              </p>
-              <p className="truncate font-display text-base font-extrabold text-zinc-900">
-                {result.bairro} • São José dos Campos
+        <div
+          role="region"
+          aria-label="Cidade desbloqueada"
+          className="mt-5 rounded-2xl border-2 border-sage-300 bg-sage-50/70 p-5 transition-all animate-in fade-in slide-in-from-top-2 duration-300"
+        >
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-sage-600 text-white shadow-xs">
+              <BadgeCheck className="h-6 w-6" />
+            </span>
+            <div className="flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-sage-200 px-2.5 py-0.5 text-xs font-bold text-sage-800">
+                  CIDADE LIBERADA
+                </span>
+                <span className="text-xs font-medium text-sage-700">Piloto Oficial Ativo</span>
+              </div>
+              <h3 className="mt-1 font-display text-lg font-extrabold text-earth-900">
+                Boa notícia! São José dos Campos já está ativa no Connecta.
+              </h3>
+              <p className="mt-1 text-sm text-earth-700">
+                Seu bairro ({result.bairro}) já tem causas e projetos de lei traduzidos aguardando sua voz.
               </p>
             </div>
           </div>
-          <ul className="divide-y divide-emerald-100 bg-white">
-            {LOCAL_PETITIONS.map((p) => (
-              <li key={p.title} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
-                <span className="min-w-0 truncate font-medium text-zinc-800">{p.title}</span>
-                <span className="shrink-0 text-xs font-bold text-orange-700 tabular-nums">
-                  {formatNumber(p.supporters)} apoios
-                </span>
-              </li>
-            ))}
-          </ul>
-          <div className="flex flex-col gap-2 p-4 sm:flex-row">
+
+          <div className="mt-4 rounded-xl border border-sage-200/80 bg-white p-3.5">
+            <p className="text-xs font-bold uppercase tracking-wider text-earth-500">
+              Petições em alta na sua região:
+            </p>
+            <ul className="mt-2 divide-y divide-cream-200 text-sm">
+              {LOCAL_PETITIONS.map((p) => (
+                <li key={p.title} className="flex items-center justify-between py-2 text-earth-800">
+                  <span className="truncate pr-3 font-medium">{p.title}</span>
+                  <span className="shrink-0 rounded-full bg-cream-200 px-2.5 py-0.5 text-xs font-bold text-earth-700">
+                    {formatNumber(p.supporters)} apoios
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="mt-4 flex flex-col gap-2.5 sm:flex-row">
             <Link
-              href={`/cadastro?cep=${result.cep}`}
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-800"
+              href="/cadastro"
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-sage-700 px-5 py-3 text-sm font-bold text-white shadow-sm transition-all hover:bg-sage-800"
             >
-              Criar conta verificada
-              <ArrowRight className="h-4 w-4" />
+              <BadgeCheck className="h-4 w-4" />
+              Criar Conta de Cidadão Verificado
             </Link>
-            <Link
-              href="/feed"
-              className="inline-flex items-center justify-center rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-800 hover:border-zinc-400"
+            <a
+              href="#processos"
+              className="inline-flex items-center justify-center rounded-full border border-sage-300 bg-white px-5 py-3 text-sm font-semibold text-sage-800 hover:bg-sage-100"
             >
-              Ver pautas do bairro
-            </Link>
+              Ver Causas do Feed
+            </a>
           </div>
         </div>
       )}
 
-      {result?.kind === 'locked' && (() => {
-        const current = result.current + (joined ? 1 : 0);
-        const missing = Math.max(result.goal - current, 0);
-        const pct = Math.min(100, Math.floor((current / result.goal) * 100));
-        const cityLabel = result.uf ? `${result.city} (${result.uf})` : result.city;
-        const shareText = `Estou ajudando a liberar o Connecta Brasil em ${result.city}! Faltam só ${missing} moradores para a gente ter abaixo-assinados verificados e as leis da Câmara traduzidas pro nosso bairro. Entra com seu CEP:`;
-
-        return (
-          <div className="mt-4 rounded-xl border-2 border-orange-500 bg-orange-50/50 p-4">
-            <div className="flex items-start gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-orange-100 text-orange-700">
-                <Lock className="h-5 w-5" />
+      {/* Estado em fila (outras cidades) */}
+      {result?.kind === 'locked' && (
+        <div
+          role="region"
+          aria-label="Cidade em fila de desbloqueio"
+          className="mt-5 rounded-2xl border-2 border-terracotta-200 bg-terracotta-50/60 p-5 transition-all animate-in fade-in slide-in-from-top-2 duration-300"
+        >
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-terracotta-500 text-white shadow-xs">
+              <Users className="h-5 w-5" />
+            </span>
+            <div className="flex-1">
+              <span className="rounded-full bg-terracotta-200 px-2.5 py-0.5 text-xs font-bold text-terracotta-800">
+                META COMUNITÁRIA DE DESBLOQUEIO
               </span>
-              <div className="min-w-0">
-                <p className="text-xs font-bold uppercase tracking-wider text-orange-700">
-                  Desbloqueio da cidade
-                </p>
-                <p className="font-display text-base font-extrabold text-zinc-900 sm:text-lg">
-                  Faltam {missing} moradores para liberar {cityLabel}
-                </p>
-              </div>
+              <h3 className="mt-1 font-display text-lg font-extrabold text-earth-900">
+                {result.city} ({result.uf}) está quase lá!
+              </h3>
+              <p className="mt-1 text-sm text-earth-700">
+                Liberamos a inteligência cívica assim que atingirmos a meta de vizinhos cadastrados na cidade.
+              </p>
             </div>
+          </div>
 
-            <div className="mt-3">
+          <div className="mt-4">
+            <div className="flex items-center justify-between text-xs font-semibold text-earth-700">
+              <span>{formatNumber(result.current + (joined ? 1 : 0))} moradores mobilizados</span>
+              <span>Meta: {formatNumber(result.goal)}</span>
+            </div>
+            <div
+              className="mt-1.5 h-3 w-full overflow-hidden rounded-full bg-terracotta-200"
+              role="progressbar"
+              aria-valuenow={result.current + (joined ? 1 : 0)}
+              aria-valuemin={0}
+              aria-valuemax={result.goal}
+            >
               <div
-                className="h-3 w-full overflow-hidden rounded-full bg-orange-100"
-                role="progressbar"
-                aria-valuenow={current}
-                aria-valuemin={0}
-                aria-valuemax={result.goal}
-                aria-label="Moradores na fila"
-              >
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-orange-500 to-orange-600 transition-all duration-700"
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-              <div className="mt-1.5 flex justify-between text-xs font-semibold text-zinc-600">
-                <span className="tabular-nums">
-                  {current} / {result.goal} moradores
-                </span>
-                <span className="text-orange-700">{pct}%</span>
-              </div>
+                className="h-full rounded-full bg-gradient-to-r from-terracotta-400 to-terracotta-500 transition-all duration-500"
+                style={{
+                  width: `${Math.min(100, ((result.current + (joined ? 1 : 0)) / result.goal) * 100)}%`,
+                }}
+              />
             </div>
+            <p className="mt-1 text-xs text-earth-500">
+              Faltam apenas{' '}
+              <strong className="text-earth-800">
+                {Math.max(0, result.goal - (result.current + (joined ? 1 : 0)))}
+              </strong>{' '}
+              moradores para ativarmos o Diário Oficial de {result.city}.
+            </p>
+          </div>
 
+          <div className="mt-4 flex flex-col gap-2.5 sm:flex-row">
+            {!joined ? (
+              <button
+                type="button"
+                onClick={() => setJoined(true)}
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-terracotta-500 px-5 py-3 text-sm font-bold text-white shadow-hoperise-btn transition-all hover:bg-terracotta-600 cursor-pointer"
+              >
+                <Users className="h-4 w-4" />
+                Entrar na Fila de Moradores
+              </button>
+            ) : (
+              <span className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-sage-600 px-5 py-3 text-sm font-bold text-white">
+                <CheckCircle2 className="h-4 w-4" />
+                Você está na fila de desbloqueio!
+              </span>
+            )}
             <a
-              href={buildWhatsAppUrl(shareText)}
+              href={buildWhatsAppUrl(
+                `Ajude a liberar o Connecta Brasil em ${result.city}! Moradores estão se unindo para fiscalizar a Câmara e criar abaixo-assinados reais. Acesse e apoie:`,
+              )}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 py-3.5 text-base font-bold text-white shadow-sm transition-colors hover:bg-emerald-800"
+              className="inline-flex items-center justify-center gap-2 rounded-full border border-terracotta-300 bg-white px-5 py-3 text-sm font-bold text-terracotta-700 hover:bg-terracotta-100"
             >
-              <MessageCircle className="h-5 w-5" />
-              Convidar vizinhos no WhatsApp
+              <MessageCircle className="h-4 w-4 text-terracotta-600" />
+              Convidar no WhatsApp
             </a>
-            <button
-              type="button"
-              onClick={() => setJoined(true)}
-              disabled={joined}
-              className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-zinc-300 bg-white px-5 py-2.5 text-sm font-semibold text-zinc-800 transition-colors hover:border-zinc-400 disabled:border-emerald-300 disabled:bg-emerald-50 disabled:text-emerald-800"
-            >
-              {joined ? (
-                <>
-                  <BadgeCheck className="h-4 w-4" /> Você está na fila (#{current})
-                </>
-              ) : (
-                <>
-                  <Users className="h-4 w-4" /> Garantir meu lugar na fila
-                </>
-              )}
-            </button>
           </div>
-        );
-      })()}
+        </div>
+      )}
     </div>
   );
 };

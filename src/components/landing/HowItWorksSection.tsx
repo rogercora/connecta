@@ -1,64 +1,75 @@
 import React from 'react';
-import { MapPinned, BellRing, Share2, Landmark } from 'lucide-react';
+import { MapPinned, BellRing, Share2, Landmark, HeartHandshake } from 'lucide-react';
 
 const STEPS = [
   {
     icon: MapPinned,
-    title: 'Você entra pelo seu CEP',
-    text: 'Sem perfis fakes ou robôs. Cada conta é vinculada a um morador real.',
+    title: '1. Você entra com seu CEP',
+    text: 'Sem perfis falsos ou robôs. Cada cidadão é verificado no seu bairro ou cidade.',
   },
   {
     icon: BellRing,
-    title: 'Acompanha e Propõe',
-    text: 'Receba alertas claros sobre obras, leis e gastos da sua rua ou crie sua própria petição em 2 minutos.',
+    title: '2. Acompanha o que muda',
+    text: 'Nossa IA lê o Diário Oficial e avisa o que impacta sua rua, seu bolso e sua rotina.',
   },
   {
     icon: Share2,
-    title: 'Mobiliza a Vizinhança',
-    text: 'Compartilhe o link no grupo do condomínio ou do bairro e veja o contador subir em tempo real.',
+    title: '3. Mobiliza a Vizinhança',
+    text: 'Crie ou assine causas em 1 clique e compartilhe no WhatsApp do bairro e condomínio.',
   },
   {
     icon: Landmark,
-    title: 'Pressão Institucional',
-    text: 'Atingiu a meta? Geramos o dossiê oficial com assinaturas auditadas para protocolar na Câmara ou Prefeitura.',
+    title: '4. Protocolo Oficial',
+    text: 'Atingiu a meta? Geramos o documento com assinaturas auditadas para entregar na Prefeitura.',
   },
 ];
 
 export const HowItWorksSection: React.FC = () => {
   return (
-    <section id="como-funciona" className="scroll-mt-28 bg-white py-16 sm:py-20">
+    <section id="como-funciona" className="scroll-mt-24 border-b border-[#EAE3D6] bg-white py-16 sm:py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="max-w-2xl">
-          <p className="text-sm font-bold uppercase tracking-wider text-sky-700">Como funciona</p>
-          <h2 className="mt-2 font-display text-3xl font-extrabold tracking-tight text-zinc-900 sm:text-4xl">
-            Como funciona o poder coletivo
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-cream-200 px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-earth-700">
+            <HeartHandshake className="h-3.5 w-3.5 text-terracotta-500" />
+            Democracia Direta e Aberta
+          </span>
+          <h2 className="mt-3 font-display text-3xl font-extrabold tracking-tight text-earth-900 sm:text-4xl">
+            Como transformamos ideias em conquistas
           </h2>
-          <p className="mt-3 text-lg text-zinc-600">
-            Do problema na esquina ao protocolo oficial, em quatro passos.
+          <p className="mt-2 text-base text-earth-600">
+            Da pauta no Diário Oficial à melhoria na sua calçada, em quatro etapas simples.
           </p>
         </div>
 
-        <ol className="mt-12 grid gap-px overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-200 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {STEPS.map((step, i) => {
             const Icon = step.icon;
             return (
-              <li key={step.title} className="relative flex flex-col bg-white p-6 sm:p-7">
-                <div className="flex items-center justify-between">
-                  <span className="font-display text-5xl font-extrabold leading-none text-orange-500 tabular-nums">
-                    {String(i + 1).padStart(2, '0')}
-                  </span>
-                  <span className="flex h-11 w-11 items-center justify-center rounded-full border border-zinc-300 text-zinc-800">
-                    <Icon className="h-5 w-5" strokeWidth={1.75} />
-                  </span>
+              <div
+                key={step.title}
+                className="relative flex flex-col justify-between rounded-3xl border border-[#EAE3D6] bg-cream-50/50 p-7 shadow-hoperise-card transition-all hover:bg-cream-100/70 hover:shadow-hoperise-hover"
+              >
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white border border-[#EAE3D6] text-terracotta-500 shadow-2xs">
+                      <Icon className="h-6 w-6" strokeWidth={1.75} />
+                    </span>
+                    <span className="font-display text-4xl font-extrabold text-cream-400 tabular-nums">
+                      0{i + 1}
+                    </span>
+                  </div>
+                  <h3 className="mt-6 font-display text-lg font-bold text-earth-900">
+                    {step.title}
+                  </h3>
+                  <p className="mt-2 text-sm leading-relaxed text-earth-600">
+                    {step.text}
+                  </p>
                 </div>
-                <h3 className="mt-6 font-display text-lg font-bold text-zinc-900">{step.title}</h3>
-                <p className="mt-2 text-[15px] leading-relaxed text-zinc-600">{step.text}</p>
-              </li>
+              </div>
             );
           })}
-        </ol>
+        </div>
       </div>
     </section>
   );
 };
-
