@@ -3,8 +3,9 @@ import './globals.css';
 import { Providers } from './providers';
 
 export const metadata: Metadata = {
-  title: 'Conecta - Cidadania Geolocalizada',
-  description: 'Rede social de cidadania geolocalizada e inteligência cívica por CEP',
+  title: 'ConectaBr — A sua rua decide',
+  description:
+    'Inteligência cívica por CEP, Diário Oficial traduzido por IA e mobilização comunitária para transformar o seu bairro.',
   manifest: '/manifest.json',
 };
 
@@ -23,10 +24,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR">
-      <body className="bg-white font-sans antialiased text-gray-900 selection:bg-emerald-100 selection:text-emerald-900">
-        <Providers>
-          {children}
-        </Providers>
+      <body className="bg-white font-sans antialiased text-zinc-950 selection:bg-crimson-100 selection:text-crimson-900">
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

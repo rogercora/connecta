@@ -99,10 +99,10 @@ export const PostComunidadeCard: React.FC<PostComunidadeCardProps> = ({ post }) 
             <div className="flex items-center space-x-1 mt-0.5">
               {nivelVerificacao >= 2 && (
                 <>
-                  <span className="w-3.5 h-3.5 rounded-full bg-[#1ea751] text-white flex items-center justify-center text-[9px] font-black">
+                  <span className="w-3.5 h-3.5 rounded-full bg-crimson-600 text-white flex items-center justify-center text-[9px] font-black">
                     <Check className="w-2.5 h-2.5 stroke-[3.5]" />
                   </span>
-                  <span className="text-[10px] text-[#0d9488] font-bold">Cidadão Verificado</span>
+                  <span className="text-[10px] text-crimson-700 font-bold">Cidadão Verificado</span>
                 </>
               )}
               {nivelVerificacao === 1 && (
@@ -132,23 +132,23 @@ export const PostComunidadeCard: React.FC<PostComunidadeCardProps> = ({ post }) 
         />
         {/* Selo de Protocolo Oficial sobre a foto */}
         <div className="absolute top-2.5 left-2.5 bg-black/75 backdrop-blur-md text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center space-x-1.5 shadow-sm border border-white/10">
-          <FileText className="w-3 h-3 text-emerald-400" />
+          <FileText className="w-3 h-3 text-crimson-400" />
           <span>Protocolo 156: #{post.numero_protocolo}</span>
         </div>
       </div>
 
       {/* BANNER DE IMPACTO COLETIVO & ANTI-DUPLICAÇÃO: "Também me afeta (+1)" */}
-      <div className="mx-3.5 mt-2.5 p-2.5 rounded-xl bg-amber-50/80 border border-amber-200/90 flex items-center justify-between">
+      <div className="mx-3.5 mt-2.5 p-2.5 rounded-xl bg-crimson-50/70 border border-crimson-200/80 flex items-center justify-between">
         <div className="flex items-center space-x-2">
           <span className="relative flex h-2.5 w-2.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-crimson-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-crimson-600"></span>
           </span>
           <div>
-            <span className="text-xs font-black text-amber-950 block leading-tight">
+            <span className="text-xs font-black text-slate-900 block leading-tight">
               {moradoresCount} {moradoresCount === 1 ? 'morador afetado' : 'moradores afetados'}
             </span>
-            <span className="text-[10px] text-amber-800">Prioridade coletiva na Prefeitura</span>
+            <span className="text-[10px] text-crimson-800 font-semibold">Prioridade coletiva na Prefeitura</span>
           </div>
         </div>
 
@@ -157,8 +157,8 @@ export const PostComunidadeCard: React.FC<PostComunidadeCardProps> = ({ post }) 
           disabled={isUpdatingApoio}
           className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 shadow-sm active:scale-95 ${
             apoiado
-              ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-              : 'bg-white text-gray-800 border border-gray-300 hover:border-emerald-500 hover:text-emerald-700'
+              ? 'bg-crimson-600 text-white hover:bg-crimson-700 shadow-crimson-btn'
+              : 'bg-white text-slate-800 border border-slate-300 hover:border-crimson-500 hover:text-crimson-700'
           }`}
           title="Clique para somar seu apoio a este chamado e evitar chamados duplicados"
         >
@@ -169,7 +169,7 @@ export const PostComunidadeCard: React.FC<PostComunidadeCardProps> = ({ post }) 
             </>
           ) : (
             <>
-              <Megaphone className="w-3.5 h-3.5 text-emerald-600" />
+              <Megaphone className="w-3.5 h-3.5 text-crimson-600" />
               <span>Também me afeta (+1)</span>
             </>
           )}
@@ -206,7 +206,7 @@ export const PostComunidadeCard: React.FC<PostComunidadeCardProps> = ({ post }) 
         </p>
 
         {/* Hashtags dinâmicas */}
-        <p className="text-[11px] text-gray-800 font-medium space-x-1.5">
+        <p className="text-[11px] text-crimson-800 font-semibold space-x-1.5">
           <span className="hover:underline cursor-pointer">#ZeladoriaUrbana</span>
           <span className="hover:underline cursor-pointer">#{bairroExibicao.toLowerCase().replace(/\s+/g, '')}</span>
           <span className="hover:underline cursor-pointer">#{post.categoria}</span>

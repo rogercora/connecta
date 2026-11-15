@@ -1,11 +1,11 @@
 {
-  "name": "Conecta - Cidadania Geolocalizada",
-  "short_name": "Conecta",
-  "description": "Rede social de cidadania geolocalizada e inteligência cívica por CEP",
+  "name": "ConectaBr — A sua rua decide",
+  "short_name": "ConectaBr",
+  "description": "Inteligência cívica por CEP e mobilização comunitária para transformar o seu bairro",
   "start_url": "/feed",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#22c55e",
+  "theme_color": "#E11D48",
   "orientation": "portrait-primary",
   "icons": [
     {

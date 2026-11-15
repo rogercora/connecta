@@ -15,7 +15,7 @@ export default function AcoesPage() {
       </div>
 
       <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm space-y-3">
-        <div className="flex items-center space-x-2 text-emerald-600 font-bold text-xs uppercase tracking-wider">
+        <div className="flex items-center space-x-2 text-crimson-600 font-bold text-xs uppercase tracking-wider">
           <Hand className="w-4 h-4" />
           <span>Abaixo-Assinado em Andamento</span>
         </div>
@@ -29,7 +29,7 @@ export default function AcoesPage() {
         </p>
 
         <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
-          <div className="bg-emerald-500 h-full w-[78%]" />
+          <div className="bg-crimson-600 h-full w-[78%]" />
         </div>
 
         <div className="flex items-center justify-between text-[11px] text-gray-500 font-medium">
@@ -38,7 +38,7 @@ export default function AcoesPage() {
         </div>
 
         <div className="pt-2 flex items-center space-x-2">
-          <Button variant="primary" className="flex-1 rounded-xl text-xs py-2">
+          <Button variant="primary" className="flex-1 rounded-xl text-xs py-2 shadow-crimson-btn">
             <CheckCircle2 className="w-4 h-4 mr-1" />
             Assinar Digitalmente
           </Button>

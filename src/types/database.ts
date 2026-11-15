@@ -1,5 +1,5 @@
 // ============================================================
-// Connecta — Tipos do Banco de Dados (espelha schema.sql)
+// ConectaBr — Tipos do Banco de Dados (espelha schema.sql)
 // ============================================================
 
 export type NivelVerificacao = 0 | 1 | 2;

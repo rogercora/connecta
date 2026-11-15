@@ -465,8 +465,8 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
       <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="flex items-center space-x-3">
           <span className="relative flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-crimson-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-crimson-500"></span>
           </span>
           <div>
             <h2 className="text-xs sm:text-sm font-black text-gray-900 leading-tight">
@@ -480,8 +480,8 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
 
         <div className="flex flex-wrap items-center gap-2">
           {apiKey ? (
-            <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2.5 py-1 rounded-full border border-emerald-200 flex items-center space-x-1">
-              <Sparkles className="w-3 h-3 text-emerald-600" />
+            <span className="text-[10px] bg-crimson-100 text-crimson-800 font-bold px-2.5 py-1 rounded-full border border-crimson-200 flex items-center space-x-1">
+              <Sparkles className="w-3 h-3 text-crimson-600" />
               <span>IA Gemini Conectada</span>
             </span>
           ) : (
@@ -523,7 +523,7 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
           onClick={() => setActiveTab('diario_api')}
           className={`py-3 px-2 sm:px-4 text-xs sm:text-sm font-black border-b-2 flex items-center space-x-2 transition-all whitespace-nowrap ${
             activeTab === 'diario_api'
-              ? 'border-emerald-600 text-emerald-800'
+              ? 'border-crimson-600 text-crimson-800'
               : 'border-transparent text-gray-500 hover:text-gray-900'
           }`}
         >
@@ -535,11 +535,11 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
           onClick={() => setActiveTab('manual_upload')}
           className={`py-3 px-2 sm:px-4 text-xs sm:text-sm font-black border-b-2 flex items-center space-x-2 transition-all whitespace-nowrap ${
             activeTab === 'manual_upload'
-              ? 'border-emerald-600 text-emerald-800'
+              ? 'border-crimson-600 text-crimson-800'
               : 'border-transparent text-gray-500 hover:text-gray-900'
           }`}
         >
-          <UploadCloud className="w-4 h-4 text-emerald-600" />
+          <UploadCloud className="w-4 h-4 text-crimson-600" />
           <span>2. Outras Cidades (Upload / Manual)</span>
         </button>
 
@@ -547,7 +547,7 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
           onClick={() => setActiveTab('publicadas')}
           className={`py-3 px-2 sm:px-4 text-xs sm:text-sm font-black border-b-2 flex items-center space-x-2 transition-all whitespace-nowrap ${
             activeTab === 'publicadas'
-              ? 'border-emerald-600 text-emerald-800'
+              ? 'border-crimson-600 text-crimson-800'
               : 'border-transparent text-gray-500 hover:text-gray-900'
           }`}
         >
@@ -559,7 +559,7 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
           onClick={() => setActiveTab('config')}
           className={`py-3 px-2 sm:px-4 text-xs sm:text-sm font-black border-b-2 flex items-center space-x-2 transition-all whitespace-nowrap ${
             activeTab === 'config'
-              ? 'border-emerald-600 text-emerald-800'
+              ? 'border-crimson-600 text-crimson-800'
               : 'border-transparent text-gray-500 hover:text-gray-900'
           }`}
         >
@@ -570,17 +570,17 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
 
       {/* Notificação de Sucesso Global */}
       {publishSuccess && (
-        <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-2xl flex items-center justify-between animate-fadeIn">
+        <div className="p-4 bg-crimson-50 border border-crimson-300 rounded-2xl flex items-center justify-between animate-fadeIn">
           <div className="flex items-center space-x-3">
-            <CheckCircle2 className="w-6 h-6 text-emerald-600 flex-shrink-0" />
+            <CheckCircle2 className="w-6 h-6 text-crimson-600 flex-shrink-0" />
             <div>
-              <p className="text-xs font-bold text-emerald-950">{publishSuccess}</p>
-              <p className="text-[11px] text-emerald-700">A pauta já está aberta para votos dos moradores no app.</p>
+              <p className="text-xs font-bold text-crimson-950">{publishSuccess}</p>
+              <p className="text-[11px] text-crimson-700">A pauta já está aberta para votos dos moradores no app.</p>
             </div>
           </div>
           <Link
             href="/feed"
-            className="py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1"
+            className="py-1.5 px-3 bg-crimson-600 hover:bg-crimson-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1"
           >
             <span>Ver no Feed</span>
             <ArrowRight className="w-3.5 h-3.5" />
@@ -590,19 +590,19 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
 
       {/* ÁREA DE REVISÃO E APROVAÇÃO MULTI-PAUTAS */}
       {pautasRascunho.some((p) => !p.descartada) && (
-        <div className="bg-emerald-50/70 border-2 border-emerald-500 rounded-3xl p-5 sm:p-6 shadow-md space-y-5 animate-fadeIn">
+        <div className="bg-crimson-50/70 border-2 border-crimson-500 rounded-3xl p-5 sm:p-6 shadow-md space-y-5 animate-fadeIn">
           {/* Header do Bloco Multi-Pautas */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-emerald-200 pb-3 gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-crimson-200 pb-3 gap-3">
             <div className="flex items-center space-x-2.5">
-              <Sparkles className="w-5 h-5 text-emerald-700 shrink-0" />
+              <Sparkles className="w-5 h-5 text-crimson-700 shrink-0" />
               <div>
-                <h3 className="text-sm sm:text-base font-black text-emerald-950">
+                <h3 className="text-sm sm:text-base font-black text-crimson-950">
                   {pautasRascunho.filter((p) => !p.descartada).length}{' '}
                   {pautasRascunho.filter((p) => !p.descartada).length === 1
                     ? 'Matéria Identificada nesta Edição'
                     : 'Matérias Identificadas nesta Edição'}
                 </h3>
-                <span className="text-[10px] font-bold text-emerald-700">
+                <span className="text-[10px] font-bold text-crimson-700">
                   {fonteIA?.includes('gemini')
                     ? '✨ Segmentado com o modelo Google Gemini 1.5 Flash'
                     : '🔍 Segmentado pelo Extrator Local Inteligente (Motor de contingência)'}
@@ -616,7 +616,7 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
                 onClick={handleAprovarTodas}
                 isLoading={isPublishing}
                 disabled={pautasRascunho.every((p) => p.aprovada || p.descartada)}
-                className="py-1.5 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-sm"
+                className="py-1.5 px-3.5 bg-crimson-600 hover:bg-crimson-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-sm"
               >
                 <Check className="w-3.5 h-3.5 stroke-[3]" />
                 <span>Aprovar Todas</span>
@@ -639,29 +639,29 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
                   key={pauta.id_temp}
                   className={`p-4 sm:p-5 rounded-2xl border transition-all ${
                     pauta.aprovada
-                      ? 'bg-emerald-100/70 border-emerald-400'
-                      : 'bg-white border-gray-200 shadow-sm hover:border-emerald-300'
+                      ? 'bg-crimson-100/70 border-crimson-400'
+                      : 'bg-white border-gray-200 shadow-sm hover:border-crimson-300'
                   }`}
                 >
                   {pauta.aprovada ? (
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div className="flex items-center space-x-3">
-                        <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
+                        <CheckCircle2 className="w-6 h-6 text-crimson-600 shrink-0" />
                         <div>
-                          <span className="text-[10px] uppercase font-black text-emerald-700 tracking-wider">
+                          <span className="text-[10px] uppercase font-black text-crimson-700 tracking-wider">
                             Matéria #{idx + 1} • Publicada com Sucesso
                           </span>
-                          <h4 className="text-xs sm:text-sm font-black text-emerald-950">
+                          <h4 className="text-xs sm:text-sm font-black text-crimson-950">
                             {pauta.titulo}
                           </h4>
-                          <p className="text-[11px] text-emerald-800">
+                          <p className="text-[11px] text-crimson-800">
                             Liberada no feed de <strong>{pauta.bairro_alvo}</strong> ({pauta.cidade_alvo} - {pauta.estado_alvo}).
                           </p>
                         </div>
                       </div>
                       <Link
                         href="/feed"
-                        className="py-1.5 px-3 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center space-x-1 self-start sm:self-auto shrink-0"
+                        className="py-1.5 px-3 bg-crimson-700 hover:bg-crimson-800 text-white rounded-xl text-xs font-bold flex items-center space-x-1 self-start sm:self-auto shrink-0"
                       >
                         <span>Ver no Feed</span>
                         <ArrowRight className="w-3.5 h-3.5" />
@@ -672,7 +672,7 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
                       {/* Top Bar da Matéria: Categoria, Relevância e Ações */}
                       <div className="flex items-center justify-between border-b border-gray-100 pb-2">
                         <div className="flex items-center space-x-2">
-                          <span className="text-[10px] font-black bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-md uppercase">
+                          <span className="text-[10px] font-black bg-crimson-50 text-crimson-800 border border-crimson-200 px-2 py-0.5 rounded-md uppercase">
                             Matéria #{idx + 1}
                           </span>
                           {pauta.categoria && (
@@ -714,7 +714,7 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
                                 prev.map((item) => (item.id_temp === pauta.id_temp ? { ...item, titulo: val } : item))
                               );
                             }}
-                            className="w-full p-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-black text-gray-900 focus:bg-white focus:ring-1 focus:ring-emerald-500"
+                            className="w-full p-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-black text-gray-900 focus:bg-white focus:ring-1 focus:ring-crimson-500"
                           />
                         </div>
 
@@ -731,7 +731,7 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
                                 prev.map((item) => (item.id_temp === pauta.id_temp ? { ...item, resumo_ia: val } : item))
                               );
                             }}
-                            className="w-full p-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 focus:bg-white focus:ring-1 focus:ring-emerald-500"
+                            className="w-full p-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 focus:bg-white focus:ring-1 focus:ring-crimson-500"
                           />
                         </div>
 
@@ -748,7 +748,7 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
                                 prev.map((item) => (item.id_temp === pauta.id_temp ? { ...item, impacto_bairro: val } : item))
                               );
                             }}
-                            className="w-full p-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 focus:bg-white focus:ring-1 focus:ring-emerald-500"
+                            className="w-full p-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 focus:bg-white focus:ring-1 focus:ring-crimson-500"
                           />
                         </div>
 
@@ -793,7 +793,7 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
                           variant="primary"
                           onClick={() => handleAprovarPautaIndividual(pauta.id_temp)}
                           isLoading={aprovandoId === pauta.id_temp}
-                          className="py-2 px-4 rounded-xl font-bold bg-emerald-600 hover:bg-emerald-700 text-white text-xs flex items-center space-x-1.5 shadow-sm"
+                          className="py-2 px-4 rounded-xl font-bold bg-crimson-600 hover:bg-crimson-700 text-white text-xs flex items-center space-x-1.5 shadow-sm"
                         >
                           <Check className="w-3.5 h-3.5 stroke-[3]" />
                           <span>Aprovar e Publicar no Feed de {pauta.bairro_alvo}</span>
@@ -825,14 +825,14 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
             <button
               onClick={carregarEdicoesDiario}
               disabled={loadingEdicoes}
-              className="text-xs font-bold text-gray-700 hover:text-emerald-700 bg-white border border-gray-200 px-3 py-1.5 rounded-xl flex items-center space-x-1.5 shadow-sm"
+              className="text-xs font-bold text-gray-700 hover:text-crimson-700 bg-white border border-gray-200 px-3 py-1.5 rounded-xl flex items-center space-x-1.5 shadow-sm"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loadingEdicoes ? 'animate-spin' : ''}`} />
               <span>Atualizar Lista</span>
             </button>
           </div>
 
-          <div className="p-3 bg-emerald-50/60 border border-emerald-200 rounded-2xl flex items-center space-x-2 text-xs text-emerald-950">
+          <div className="p-3 bg-crimson-50/60 border border-crimson-200 rounded-2xl flex items-center space-x-2 text-xs text-crimson-950">
             <span className="text-base">💡</span>
             <span>
               <strong>Dica para São José dos Campos:</strong> As edições oficiais (inclusive a <strong>Edição nº 3.826 de 11/11/2026</strong>) são conectadas ao vivo abaixo. Basta clicar em <strong>&quot;Resumir com IA e Revisar&quot;</strong> direto na publicação desejada, sem precisar baixar ou subir arquivos manualmente!
@@ -841,7 +841,7 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
 
           {loadingEdicoes ? (
             <div className="py-16 text-center text-xs text-gray-500 space-y-2 bg-white rounded-2xl border border-gray-200">
-              <RefreshCw className="w-6 h-6 text-emerald-600 animate-spin mx-auto" />
+              <RefreshCw className="w-6 h-6 text-crimson-600 animate-spin mx-auto" />
               <p className="font-bold">Consultando API oficial de São José dos Campos...</p>
             </div>
           ) : edicoesSJC.length === 0 ? (
@@ -853,14 +853,14 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
               {edicoesSJC.map((edicao) => (
                 <div
                   key={edicao.id}
-                  className="p-4 bg-white border border-gray-200 rounded-2xl shadow-sm hover:border-emerald-300 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+                  className="p-4 bg-white border border-gray-200 rounded-2xl shadow-sm hover:border-crimson-300 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
                 >
                   <div className="space-y-1.5 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-[10px] bg-gray-100 text-gray-700 font-bold px-2 py-0.5 rounded-lg border border-gray-200">
                         Edição nº {edicao.numero} • {edicao.data}
                       </span>
-                      <span className="text-[10px] bg-emerald-50 text-emerald-800 font-bold px-2 py-0.5 rounded-lg border border-emerald-200">
+                      <span className="text-[10px] bg-crimson-50 text-crimson-800 font-bold px-2 py-0.5 rounded-lg border border-crimson-200">
                         Bairro: {edicao.bairro_sugerido}
                       </span>
                       <span className="text-[10px] text-gray-400">{edicao.secretaria}</span>
@@ -879,7 +879,7 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
                         href={edicao.pdf_url}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-[11px] font-bold text-gray-500 hover:text-emerald-700 flex items-center space-x-1"
+                        className="text-[11px] font-bold text-gray-500 hover:text-crimson-700 flex items-center space-x-1"
                       >
                         <FileText className="w-3.5 h-3.5 text-gray-400" />
                         <span>Abrir PDF Oficial de SJC</span>
@@ -893,7 +893,7 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
                       variant="primary"
                       onClick={() => handleProcessarEdicaoComIA(edicao)}
                       isLoading={isProcessing && edicaoSelecionada?.id === edicao.id}
-                      className="w-full sm:w-auto py-2.5 px-4 rounded-xl font-bold bg-emerald-600 hover:bg-emerald-700 text-white text-xs flex items-center justify-center space-x-2 shadow-sm"
+                      className="w-full sm:w-auto py-2.5 px-4 rounded-xl font-bold bg-crimson-600 hover:bg-crimson-700 text-white text-xs flex items-center justify-center space-x-2 shadow-sm"
                     >
                       <Sparkles className="w-4 h-4" />
                       <span>Resumir com IA e Revisar</span>
@@ -913,7 +913,7 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
         <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-6">
           <div className="space-y-1 border-b border-gray-100 pb-4">
             <div className="flex items-center space-x-2">
-              <UploadCloud className="w-5 h-5 text-emerald-600" />
+              <UploadCloud className="w-5 h-5 text-crimson-600" />
               <h3 className="text-sm font-black text-gray-900">
                 Ingestão para Municípios sem API Automática
               </h3>
@@ -941,7 +941,7 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
                     );
                   }
                 }}
-                className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 focus:ring-2 focus:ring-emerald-500"
+                className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 focus:ring-2 focus:ring-crimson-500"
               >
                 <option value="São José dos Campos">São José dos Campos - SP (Piloto Ativo)</option>
                 <option value="Jacareí">Jacareí - SP</option>
@@ -996,7 +996,7 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
           </div>
 
           {autoDetectNotice && (
-            <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-800 flex items-center space-x-2 animate-fadeIn">
+            <div className="p-2.5 bg-crimson-50 border border-crimson-200 rounded-xl text-xs font-bold text-crimson-800 flex items-center space-x-2 animate-fadeIn">
               <span>{autoDetectNotice}</span>
             </div>
           )}
@@ -1010,21 +1010,21 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
               <button
                 type="button"
                 onClick={() => carregarExemploCidade('Jacareí')}
-                className="py-1 px-3 rounded-lg bg-white hover:bg-emerald-50 hover:text-emerald-800 text-xs font-semibold border border-gray-200 shadow-2xs transition-colors"
+                className="py-1 px-3 rounded-lg bg-white hover:bg-crimson-50 hover:text-crimson-800 text-xs font-semibold border border-gray-200 shadow-2xs transition-colors"
               >
                 🚌 Jacareí (Subsídio Tarifa Ônibus)
               </button>
               <button
                 type="button"
                 onClick={() => carregarExemploCidade('Caçapava')}
-                className="py-1 px-3 rounded-lg bg-white hover:bg-emerald-50 hover:text-emerald-800 text-xs font-semibold border border-gray-200 shadow-2xs transition-colors"
+                className="py-1 px-3 rounded-lg bg-white hover:bg-crimson-50 hover:text-crimson-800 text-xs font-semibold border border-gray-200 shadow-2xs transition-colors"
               >
                 🚧 Caçapava (Drenagem e Asfalto)
               </button>
               <button
                 type="button"
                 onClick={() => carregarExemploCidade('Taubaté')}
-                className="py-1 px-3 rounded-lg bg-white hover:bg-emerald-50 hover:text-emerald-800 text-xs font-semibold border border-gray-200 shadow-2xs transition-colors"
+                className="py-1 px-3 rounded-lg bg-white hover:bg-crimson-50 hover:text-crimson-800 text-xs font-semibold border border-gray-200 shadow-2xs transition-colors"
               >
                 🍎 Taubaté (Feiras e Comércio)
               </button>
@@ -1038,7 +1038,7 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
               onClick={() => setManualModo('texto')}
               className={`pb-2 text-xs font-bold border-b-2 transition-all flex items-center space-x-1.5 ${
                 manualModo === 'texto'
-                  ? 'border-emerald-600 text-emerald-800'
+                  ? 'border-crimson-600 text-crimson-800'
                   : 'border-transparent text-gray-400 hover:text-gray-700'
               }`}
             >
@@ -1050,7 +1050,7 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
               onClick={() => setManualModo('pdf')}
               className={`pb-2 text-xs font-bold border-b-2 transition-all flex items-center space-x-1.5 ${
                 manualModo === 'pdf'
-                  ? 'border-emerald-600 text-emerald-800'
+                  ? 'border-crimson-600 text-crimson-800'
                   : 'border-transparent text-gray-400 hover:text-gray-700'
               }`}
             >
@@ -1070,7 +1070,7 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
                 value={manualTexto}
                 onChange={(e) => setManualTexto(e.target.value)}
                 placeholder="Cole aqui o texto da publicação oficial da prefeitura ou câmara..."
-                className="w-full p-3 border border-gray-200 rounded-xl text-xs font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none leading-relaxed"
+                className="w-full p-3 border border-gray-200 rounded-xl text-xs font-mono focus:ring-2 focus:ring-crimson-500 focus:outline-none leading-relaxed"
               />
             </div>
           )}
@@ -1088,27 +1088,27 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
 
               <div
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full p-8 border-2 border-dashed border-gray-300 hover:border-emerald-500 bg-gray-50 rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all text-center space-y-2"
+                className="w-full p-8 border-2 border-dashed border-gray-300 hover:border-crimson-500 bg-gray-50 rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all text-center space-y-2"
               >
                 {manualPdfFile ? (
                   <div className="space-y-1">
-                    <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto" />
+                    <CheckCircle2 className="w-8 h-8 text-crimson-600 mx-auto" />
                     <p className="text-xs font-bold text-gray-900">{manualPdfFile.name}</p>
                     <p className="text-[10px] text-gray-500">
                       Tamanho: {(manualPdfFile.size / 1024).toFixed(1)} KB • Pronto para leitura direta com a IA
                     </p>
                     {autoDetectNotice && (
-                      <p className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200 inline-block mt-1">
+                      <p className="text-[11px] font-bold text-crimson-700 bg-crimson-50 px-2 py-0.5 rounded-lg border border-crimson-200 inline-block mt-1">
                         {autoDetectNotice}
                       </p>
                     )}
-                    <span className="text-[11px] text-emerald-600 underline font-semibold block pt-1">
+                    <span className="text-[11px] text-crimson-600 underline font-semibold block pt-1">
                       Clique para trocar de arquivo
                     </span>
                   </div>
                 ) : (
                   <>
-                    <UploadCloud className="w-10 h-10 text-emerald-600" />
+                    <UploadCloud className="w-10 h-10 text-crimson-600" />
                     <p className="text-xs font-bold text-gray-800">
                       Arraste ou clique para carregar o PDF do Diário Oficial
                     </p>
@@ -1133,7 +1133,7 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
             variant="primary"
             onClick={handleProcessarManualComIA}
             isLoading={isProcessing}
-            className="w-full py-3.5 rounded-xl font-bold bg-emerald-600 hover:bg-emerald-700 text-white text-xs flex items-center justify-center space-x-2 shadow-md"
+            className="w-full py-3.5 rounded-xl font-bold bg-crimson-600 hover:bg-crimson-700 text-white text-xs flex items-center justify-center space-x-2 shadow-md"
           >
             <Sparkles className="w-4 h-4" />
             <span>Processar Publicação com IA e Gerar Prévia</span>
@@ -1193,7 +1193,7 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
                 <div key={pauta.id} className="py-3.5 flex items-start justify-between space-x-4">
                   <div className="space-y-1 flex-1">
                     <div className="flex items-center space-x-2">
-                      <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
+                      <span className="text-[10px] bg-crimson-100 text-crimson-800 font-bold px-2 py-0.5 rounded-full">
                         {pauta.cidade_alvo || 'SJC'} • {pauta.bairro_alvo || 'Geral'}
                       </span>
                       <span className="text-[10px] text-gray-400">
@@ -1207,7 +1207,7 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
                       {pauta.resumo_ia}
                     </p>
                     <div className="flex items-center space-x-4 text-[11px] text-gray-500 pt-1 font-medium">
-                      <span className="text-emerald-600 font-bold">
+                      <span className="text-crimson-600 font-bold">
                         👍 {pauta.votos_concordar || 0} Concordam
                       </span>
                       <span className="text-red-600 font-bold">
@@ -1246,7 +1246,7 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
           </div>
 
           {statusMessage && (
-            <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-800 rounded-xl text-xs font-bold animate-fadeIn">
+            <div className="p-3 bg-crimson-50 border border-crimson-300 text-crimson-800 rounded-xl text-xs font-bold animate-fadeIn">
               {statusMessage}
             </div>
           )}
@@ -1255,14 +1255,14 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-gray-700 flex items-center justify-between">
               <span className="flex items-center space-x-1.5">
-                <Key className="w-4 h-4 text-emerald-600" />
+                <Key className="w-4 h-4 text-crimson-600" />
                 <span>Google Gemini API Key:</span>
               </span>
               <a
                 href="https://aistudio.google.com/app/apikey"
                 target="_blank"
                 rel="noreferrer"
-                className="text-emerald-600 hover:underline text-[11px] flex items-center space-x-1"
+                className="text-crimson-600 hover:underline text-[11px] flex items-center space-x-1"
               >
                 <span>Obter chave gratuita no Google AI Studio</span>
                 <ExternalLink className="w-3 h-3" />
@@ -1298,11 +1298,11 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
               rows={10}
               value={customPrompt}
               onChange={(e) => setCustomPrompt(e.target.value)}
-              className="w-full p-3 border border-gray-200 rounded-xl text-xs font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none leading-relaxed"
+              className="w-full p-3 border border-gray-200 rounded-xl text-xs font-mono focus:ring-2 focus:ring-crimson-500 focus:outline-none leading-relaxed"
             />
           </div>
 
-          <Button type="submit" variant="primary" className="py-3 px-6 font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl">
+          <Button type="submit" variant="primary" className="py-3 px-6 font-bold bg-crimson-600 hover:bg-crimson-700 text-white rounded-xl">
             Salvar Configurações
           </Button>
         </form>

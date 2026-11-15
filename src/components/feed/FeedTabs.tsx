@@ -11,7 +11,7 @@ interface FeedTabsProps {
 
 export const FeedTabs: React.FC<FeedTabsProps> = ({ activeTab, onTabChange }) => {
   return (
-    <div className="w-full bg-white border-b border-gray-200 sticky top-14 z-30">
+    <div className="w-full bg-white border-b border-zinc-200 sticky top-14 z-30 shadow-2xs">
       <div className="flex max-w-md mx-auto">
         {FEED_TABS.map((tab) => {
           const isActive = activeTab === tab.id;
@@ -20,15 +20,15 @@ export const FeedTabs: React.FC<FeedTabsProps> = ({ activeTab, onTabChange }) =>
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
               className={cn(
-                'flex-1 py-3 text-center text-xs sm:text-sm font-semibold transition-colors relative',
+                'flex-1 py-3 text-center text-xs sm:text-sm font-bold transition-all relative cursor-pointer',
                 isActive
-                  ? 'text-gray-900 font-bold'
-                  : 'text-gray-400 hover:text-gray-600'
+                  ? 'text-zinc-950 font-black'
+                  : 'text-zinc-400 hover:text-zinc-700'
               )}
             >
               <span>{tab.label}</span>
               {isActive && (
-                <div className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-gray-900" />
+                <div className="absolute bottom-0 left-2 right-2 h-[3px] bg-crimson-600 rounded-t-full" />
               )}
             </button>
           );

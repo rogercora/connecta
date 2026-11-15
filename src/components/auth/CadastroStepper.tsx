@@ -83,17 +83,22 @@ export const CadastroStepper: React.FC = () => {
     <div className="w-full max-w-sm mx-auto space-y-6">
       {/* Header */}
       <div className="text-center space-y-1">
-        <h1 className="text-3xl font-black text-gray-900 tracking-tighter">
-          Conecta
-        </h1>
+        <div className="flex items-center justify-center space-x-2">
+          <span className="w-8 h-8 rounded-xl bg-crimson-600 text-white flex items-center justify-center font-black shadow-crimson-btn">
+            📢
+          </span>
+          <h1 className="text-3xl font-black text-gray-900 tracking-tighter">
+            Conecta<span className="text-crimson-600">Br</span>
+          </h1>
+        </div>
         <p className="text-xs text-gray-500">
           Cadastro de Cidadão - Etapa {step} de 2
         </p>
 
         {/* Stepper Dots */}
         <div className="flex items-center justify-center space-x-2 pt-2">
-          <div className={`h-1.5 rounded-full transition-all ${step === 1 ? 'w-8 bg-emerald-600' : 'w-4 bg-emerald-200'}`} />
-          <div className={`h-1.5 rounded-full transition-all ${step === 2 ? 'w-8 bg-emerald-600' : 'w-4 bg-gray-200'}`} />
+          <div className={`h-1.5 rounded-full transition-all ${step === 1 ? 'w-8 bg-crimson-600' : 'w-4 bg-crimson-200'}`} />
+          <div className={`h-1.5 rounded-full transition-all ${step === 2 ? 'w-8 bg-crimson-600' : 'w-4 bg-gray-200'}`} />
         </div>
       </div>
 
@@ -170,13 +175,13 @@ export const CadastroStepper: React.FC = () => {
             {endereco && (
               <>
                 {endereco.isSJC ? (
-                  <div className="mt-2.5 p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-start space-x-2 text-xs text-emerald-900 shadow-sm">
-                    <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <div className="mt-2.5 p-3.5 bg-crimson-50 border border-crimson-200 rounded-2xl flex items-start space-x-2 text-xs text-crimson-900 shadow-sm">
+                    <CheckCircle className="w-4 h-4 text-crimson-600 shrink-0 mt-0.5" />
                     <div className="space-y-0.5">
-                      <p className="font-extrabold text-emerald-800">
+                      <p className="font-extrabold text-crimson-800">
                         🎉 Piloto Oficial Ativo em SJC!
                       </p>
-                      <p className="text-[11px] text-emerald-700">
+                      <p className="text-[11px] text-crimson-700">
                         Bairro: <strong>{endereco.bairro}</strong> ({endereco.localidade} - {endereco.uf})
                       </p>
                     </div>
@@ -227,7 +232,7 @@ export const CadastroStepper: React.FC = () => {
 
       <div className="text-center text-xs text-gray-600">
         Já possui conta?{' '}
-        <Link href="/login" className="text-emerald-600 font-bold hover:underline">
+        <Link href="/login" className="text-crimson-600 font-bold hover:underline">
           Fazer Login
         </Link>
       </div>

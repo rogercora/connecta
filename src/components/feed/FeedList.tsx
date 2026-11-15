@@ -52,7 +52,7 @@ export const FeedList: React.FC<FeedListProps> = ({ feedLevel, onSwitchTab }) =>
   if (loadingPautas || loadingPosts) {
     return (
       <div className="w-full max-w-md mx-auto py-16 flex flex-col items-center justify-center space-y-3 text-gray-500">
-        <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-6 h-6 border-2 border-crimson-600 border-t-transparent rounded-full animate-spin" />
         <span className="text-xs font-semibold text-gray-600">Carregando feed de {userCidade}...</span>
       </div>
     );

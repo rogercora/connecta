@@ -29,9 +29,14 @@ export const LoginForm: React.FC = () => {
     <div className="w-full max-w-sm mx-auto space-y-6">
       {/* Logo */}
       <div className="text-center space-y-1">
-        <h1 className="text-3xl font-black text-gray-900 tracking-tighter">
-          Conecta
-        </h1>
+        <div className="flex items-center justify-center space-x-2">
+          <span className="w-8 h-8 rounded-xl bg-crimson-600 text-white flex items-center justify-center font-black shadow-crimson-btn">
+            📢
+          </span>
+          <h1 className="text-3xl font-black text-gray-900 tracking-tighter">
+            Conecta<span className="text-crimson-600">Br</span>
+          </h1>
+        </div>
         <p className="text-xs text-gray-500">
           Sua voz, seu bairro, sua cidade em tempo real.
         </p>
@@ -75,14 +80,14 @@ export const LoginForm: React.FC = () => {
               type="checkbox"
               checked={rememberMe}
               onChange={(e) => setRememberMe(e.target.checked)}
-              className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+              className="rounded border-gray-300 text-crimson-600 focus:ring-crimson-500"
             />
             <span>Lembrar de mim</span>
           </label>
 
           <Link
             href="/recuperar-senha"
-            className="text-emerald-600 hover:underline font-medium"
+            className="text-crimson-600 hover:underline font-medium"
           >
             Esqueceu a senha?
           </Link>
@@ -107,7 +112,7 @@ export const LoginForm: React.FC = () => {
 
       <div className="text-center text-xs text-gray-600">
         Não possui uma conta?{' '}
-        <Link href="/cadastro" className="text-emerald-600 font-bold hover:underline">
+        <Link href="/cadastro" className="text-crimson-600 font-bold hover:underline">
           Cadastre-se gratuitamente
         </Link>
       </div>

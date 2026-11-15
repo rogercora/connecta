@@ -27,7 +27,7 @@ export const CidadeEsperaView: React.FC<CidadeEsperaViewProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
 
-  const shareText = `Vizinhos de ${cidadeStatus.cidade}! O Conecta está prestes a ser liberado na nossa cidade para acompanharmos pautas da Câmara com IA e cobrarmos zeladoria urbana com protocolo. Faltam poucas pessoas para bater a meta! Cadastre-se pelo link para liberar: https://connecta-swart-pi.vercel.app/cadastro`;
+  const shareText = `Vizinhos de ${cidadeStatus.cidade}! O ConectaBr está prestes a ser liberado na nossa cidade para acompanharmos pautas da Câmara com IA e cobrarmos zeladoria urbana com protocolo. Faltam poucas pessoas para bater a meta! Cadastre-se pelo link para liberar: https://connecta-swart-pi.vercel.app/cadastro`;
 
   const shareUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
 
@@ -42,7 +42,7 @@ export const CidadeEsperaView: React.FC<CidadeEsperaViewProps> = ({
       {/* Card Principal de Espera */}
       <div className="bg-white border border-gray-200/90 rounded-3xl p-5 shadow-sm text-center space-y-4">
         {/* Badge de Status */}
-        <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
+        <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-bold bg-crimson-50 text-crimson-800 border border-crimson-200">
           <span className="text-sm">🚀</span>
           <span>Desbloqueio Comunitário</span>
         </div>
@@ -50,8 +50,8 @@ export const CidadeEsperaView: React.FC<CidadeEsperaViewProps> = ({
         {/* Título */}
         <div>
           <h2 className="text-xl font-black text-gray-900 tracking-tight leading-tight">
-            O Conecta está quase chegando em{' '}
-            <span className="text-emerald-600 block">
+            O ConectaBr está quase chegando em{' '}
+            <span className="text-crimson-600 block">
               {cidadeStatus.cidade} - {cidadeStatus.estado}
             </span>
           </h2>
@@ -64,22 +64,22 @@ export const CidadeEsperaView: React.FC<CidadeEsperaViewProps> = ({
         <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-2.5">
           <div className="flex items-center justify-between text-xs font-bold text-gray-700">
             <span className="flex items-center space-x-1">
-              <Users className="w-3.5 h-3.5 text-emerald-600" />
+              <Users className="w-3.5 h-3.5 text-crimson-600" />
               <span>{cidadeStatus.total_cadastrados} cadastrados</span>
             </span>
-            <span className="text-emerald-700">{cidadeStatus.porcentagem}%</span>
+            <span className="text-crimson-700">{cidadeStatus.porcentagem}%</span>
           </div>
 
           <div className="w-full bg-gray-200 h-3 rounded-full overflow-hidden p-0.5">
             <div
-              className="bg-emerald-500 h-full rounded-full transition-all duration-700 ease-out"
+              className="bg-crimson-600 h-full rounded-full transition-all duration-700 ease-out"
               style={{ width: `${Math.max(6, cidadeStatus.porcentagem)}%` }}
             />
           </div>
 
           <p className="text-[11px] text-gray-500 font-medium">
             Meta: <strong>{cidadeStatus.meta_usuarios} cidadãos</strong> (faltam{' '}
-            <strong className="text-emerald-700">{cidadeStatus.faltam}</strong>)
+            <strong className="text-crimson-700">{cidadeStatus.faltam}</strong>)
           </p>
         </div>
 
@@ -101,8 +101,8 @@ export const CidadeEsperaView: React.FC<CidadeEsperaViewProps> = ({
           >
             {copied ? (
               <>
-                <Check className="w-3.5 h-3.5 text-emerald-600" />
-                <span className="text-emerald-600">Link copiado para a área de transferência!</span>
+                <Check className="w-3.5 h-3.5 text-crimson-600" />
+                <span className="text-crimson-600">Link copiado para a área de transferência!</span>
               </>
             ) : (
               <>
@@ -118,17 +118,17 @@ export const CidadeEsperaView: React.FC<CidadeEsperaViewProps> = ({
       {onExplorarFederal && (
         <div
           onClick={onExplorarFederal}
-          className="bg-emerald-50/70 border border-emerald-100 rounded-2xl p-3.5 flex items-center justify-between cursor-pointer hover:bg-emerald-100/70 transition-colors group"
+          className="bg-crimson-50/70 border border-crimson-100 rounded-2xl p-3.5 flex items-center justify-between cursor-pointer hover:bg-crimson-100/70 transition-colors group"
         >
           <div className="space-y-0.5 pr-2">
-            <p className="text-xs font-bold text-emerald-950">
+            <p className="text-xs font-bold text-crimson-950">
               Quer ver a IA em ação agora?
             </p>
-            <p className="text-[11px] text-emerald-800">
+            <p className="text-[11px] text-crimson-800">
               Acesse a aba <strong>Brasil Federal</strong> para votar em pautas de lei nacionais.
             </p>
           </div>
-          <ArrowRight className="w-4 h-4 text-emerald-600 group-hover:translate-x-1 transition-transform shrink-0" />
+          <ArrowRight className="w-4 h-4 text-crimson-600 group-hover:translate-x-1 transition-transform shrink-0" />
         </div>
       )}
     </div>

@@ -31,7 +31,7 @@ export default function PerfilPage() {
     <div className="p-4 space-y-4">
       {/* Card do Usuário */}
       <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm text-center relative overflow-hidden">
-        <div className="relative w-20 h-20 mx-auto rounded-full overflow-hidden bg-emerald-100 mb-3 border-2 border-emerald-500">
+        <div className="relative w-20 h-20 mx-auto rounded-full overflow-hidden bg-crimson-50 mb-3 border-2 border-crimson-600">
           {user?.avatar_url ? (
             <Image
               src={user.avatar_url}
@@ -40,7 +40,7 @@ export default function PerfilPage() {
               className="object-cover"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center font-bold text-emerald-800 text-xl">
+            <div className="w-full h-full flex items-center justify-center font-bold text-crimson-800 text-xl">
               MS
             </div>
           )}
@@ -54,8 +54,8 @@ export default function PerfilPage() {
         </p>
 
         {/* Badge de Nível */}
-        <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-bold mt-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200">
-          <ShieldCheck className="w-4 h-4 text-emerald-600" />
+        <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-bold mt-2.5 bg-crimson-50 text-crimson-700 border border-crimson-200">
+          <ShieldCheck className="w-4 h-4 text-crimson-600" />
           <span>
             {isNivel2 ? 'Nível 2: Cidadã Verificada' : 'Nível 1: Usuário Cadastrado'}
           </span>
@@ -84,10 +84,10 @@ export default function PerfilPage() {
             </p>
           </div>
 
-          <div className={`p-3 rounded-xl border transition-all ${isNivel2 ? 'bg-emerald-50 border-emerald-300' : 'bg-gray-50 border-gray-200'}`}>
+          <div className={`p-3 rounded-xl border transition-all ${isNivel2 ? 'bg-crimson-50 border-crimson-300' : 'bg-gray-50 border-gray-200'}`}>
             <div className="flex items-center justify-between">
               <span className="font-bold text-gray-800">Nível 2 (Cidadão Verificado)</span>
-              {isNivel2 && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
+              {isNivel2 && <CheckCircle2 className="w-4 h-4 text-crimson-600" />}
             </div>
             <p className="text-[11px] text-gray-600 mt-1">
               Comprovante de residência / Prova de vida auditada. Libera voto direto nas pautas da Câmara e assinatura em petições públicas.
@@ -108,7 +108,7 @@ export default function PerfilPage() {
       <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm space-y-3">
         <div className="flex items-center justify-between">
           <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center space-x-1">
-            <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+            <MapPin className="w-3.5 h-3.5 text-crimson-600" />
             <span>Simulador de Cidade</span>
           </h4>
           <span className="text-[10px] text-gray-400 font-semibold">Teste do Piloto</span>
@@ -123,11 +123,11 @@ export default function PerfilPage() {
             onClick={() => handleMudarCidade('São José dos Campos', 'SP', 'Jardim Aquárius', '12246-021')}
             className={`p-2.5 rounded-xl border text-left text-xs font-bold transition-all ${
               user?.cidade === 'São José dos Campos'
-                ? 'bg-emerald-50 border-emerald-500 text-emerald-900 ring-1 ring-emerald-500'
+                ? 'bg-crimson-50 border-crimson-500 text-crimson-900 ring-1 ring-crimson-500'
                 : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
             }`}
           >
-            <span className="block text-[10px] text-emerald-600 font-extrabold uppercase">🟢 Piloto Ativo</span>
+            <span className="block text-[10px] text-crimson-600 font-extrabold uppercase">🔴 Piloto Ativo</span>
             São José dos Campos
           </button>
 
@@ -152,25 +152,25 @@ export default function PerfilPage() {
           <p className="text-[10px] text-gray-500 font-medium">Zeladorias</p>
         </div>
         <div className="bg-white p-3 rounded-xl border border-gray-100 text-center shadow-sm">
-          <p className="text-base font-black text-emerald-600">4</p>
+          <p className="text-base font-black text-crimson-600">4</p>
           <p className="text-[10px] text-gray-500 font-medium">Votos em Leis</p>
         </div>
         <div className="bg-white p-3 rounded-xl border border-gray-100 text-center shadow-sm">
-          <p className="text-base font-black text-blue-600">1</p>
+          <p className="text-base font-black text-slate-800">1</p>
           <p className="text-[10px] text-gray-500 font-medium">Petição Ativa</p>
         </div>
       </div>
 
       {/* Acesso ao Painel de Moderação Cívica (Admin) */}
-      <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-4 shadow-sm space-y-2">
+      <div className="bg-gradient-to-r from-crimson-50 to-rose-50 border border-crimson-200 rounded-2xl p-4 shadow-sm space-y-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <Sparkles className="w-4 h-4 text-emerald-600" />
+            <Sparkles className="w-4 h-4 text-crimson-600" />
             <h4 className="text-xs font-black text-gray-900">
               Modo Administrador & IA
             </h4>
           </div>
-          <span className="text-[10px] bg-emerald-600 text-white font-bold px-2 py-0.5 rounded-full">
+          <span className="text-[10px] bg-crimson-600 text-white font-bold px-2 py-0.5 rounded-full">
             Gestor SJC
           </span>
         </div>
@@ -180,7 +180,7 @@ export default function PerfilPage() {
         <Button
           variant="primary"
           onClick={() => router.push('/admin')}
-          className="w-full rounded-xl py-2.5 font-bold text-xs bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center space-x-1.5"
+          className="w-full rounded-xl py-2.5 font-bold text-xs bg-crimson-600 hover:bg-crimson-700 text-white shadow-crimson-btn flex items-center justify-center space-x-1.5"
         >
           <span>Abrir Painel de Moderação</span>
           <ArrowRight className="w-3.5 h-3.5" />

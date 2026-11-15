@@ -60,7 +60,7 @@ export const DiscordarModal: React.FC<DiscordarModalProps> = ({ isOpen, onClose,
               value={motivo}
               onChange={(e) => setMotivo(e.target.value)}
               placeholder="Ex: O aumento de tráfego vai prejudicar o acesso dos moradores e o comércio local..."
-              className="w-full p-3.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all resize-none text-gray-800"
+              className="w-full p-3.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-crimson-600 focus:border-transparent transition-all resize-none text-gray-800"
             />
 
             <div className="flex space-x-2">

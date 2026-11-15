@@ -77,9 +77,9 @@ const TABS: { id: 'todos' | ProcessCategory; label: string }[] = [
 ];
 
 const CATEGORY_STYLE: Record<ProcessCategory, { chip: string; icon: React.ElementType }> = {
-  peticao: { chip: 'bg-terracotta-100 text-terracotta-800 border-terracotta-200', icon: Megaphone },
-  lei: { chip: 'bg-cream-300/80 text-earth-800 border-cream-400', icon: FileText },
-  zeladoria: { chip: 'bg-sage-100 text-sage-800 border-sage-200', icon: Wrench },
+  peticao: { chip: 'bg-crimson-50 text-crimson-800 border-crimson-200', icon: Megaphone },
+  lei: { chip: 'bg-zinc-100 text-zinc-900 border-zinc-200', icon: FileText },
+  zeladoria: { chip: 'bg-amber-50 text-amber-900 border-amber-200', icon: Wrench },
 };
 
 interface ProcessesSectionProps {
@@ -113,23 +113,23 @@ export const ProcessesSection: React.FC<ProcessesSectionProps> = ({ userProcesse
   };
 
   return (
-    <section id="processos" className="scroll-mt-24 border-b border-[#EAE3D6] bg-[#FAF7F2] py-16 sm:py-20">
+    <section id="processos" className="scroll-mt-24 border-b border-zinc-200 bg-zinc-50/70 py-16 sm:py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-cream-200 px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-earth-700">
-              <Sparkles className="h-3.5 w-3.5 text-terracotta-500" />
-              Mobilização Comunitária Ativa
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-crimson-50 border border-crimson-200/80 px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-crimson-700">
+              <Megaphone className="h-3.5 w-3.5 text-crimson-600" />
+              Mobilização Popular Ativa
             </span>
-            <h2 className="mt-3 font-display text-3xl font-extrabold tracking-tight text-earth-900 sm:text-4xl">
+            <h2 className="mt-3 font-display text-3xl font-extrabold tracking-tight text-zinc-950 sm:text-4xl">
               Causas e decisões abertas no seu bairro
             </h2>
-            <p className="mt-2 text-base text-earth-600">
+            <p className="mt-2 text-base text-zinc-600">
               Vote em leis locais ou apoie petições populares verificadas com um simples toque.
             </p>
           </div>
 
-          {/* Abas em pílula no estilo HopeRise */}
+          {/* Abas em pílula */}
           <div
             role="tablist"
             aria-label="Filtrar processos"
@@ -146,14 +146,14 @@ export const ProcessesSection: React.FC<ProcessesSectionProps> = ({ userProcesse
                   onClick={() => setActiveTab(tab.id)}
                   className={`shrink-0 rounded-full border px-4 py-2 text-sm font-bold transition-all cursor-pointer ${
                     active
-                      ? 'border-terracotta-500 bg-terracotta-500 text-white shadow-hoperise-btn'
-                      : 'border-[#EAE3D6] bg-white text-earth-700 hover:border-cream-400 hover:bg-cream-100'
+                      ? 'border-crimson-600 bg-crimson-600 text-white shadow-crimson-btn'
+                      : 'border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-100'
                   }`}
                 >
                   {tab.label}
                   <span
                     className={`ml-1.5 rounded-full px-2 py-0.5 text-xs ${
-                      active ? 'bg-white/20 text-white' : 'bg-cream-200 text-earth-600'
+                      active ? 'bg-white/25 text-white' : 'bg-zinc-100 text-zinc-600'
                     }`}
                   >
                     {counts[tab.id]}
@@ -164,7 +164,7 @@ export const ProcessesSection: React.FC<ProcessesSectionProps> = ({ userProcesse
           </div>
         </div>
 
-        {/* Grid de causas e processos estilo HopeRise */}
+        {/* Grid de causas */}
         <div className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {items.map((item) => {
             const style = CATEGORY_STYLE[item.category];
@@ -182,20 +182,20 @@ export const ProcessesSection: React.FC<ProcessesSectionProps> = ({ userProcesse
               indicator = (
                 <div>
                   <div className="flex justify-between text-xs font-semibold">
-                    <span className="text-sage-700">{pctFavor}% a favor</span>
-                    <span className="text-earth-500">{formatNumber(favor + contra)} votos da cidade</span>
+                    <span className="text-emerald-700">{pctFavor}% a favor</span>
+                    <span className="text-zinc-500">{formatNumber(favor + contra)} votos da cidade</span>
                   </div>
-                  <div className="mt-1.5 flex h-2.5 overflow-hidden rounded-full bg-cream-200">
-                    <div className="bg-sage-500 transition-all duration-500" style={{ width: `${pctFavor}%` }} />
-                    <div className="bg-red-400 transition-all duration-500" style={{ width: `${100 - pctFavor}%` }} />
+                  <div className="mt-1.5 flex h-2.5 overflow-hidden rounded-full bg-zinc-200">
+                    <div className="bg-emerald-600 transition-all duration-500" style={{ width: `${pctFavor}%` }} />
+                    <div className="bg-red-500 transition-all duration-500" style={{ width: `${100 - pctFavor}%` }} />
                   </div>
                 </div>
               );
 
               if (mine) {
                 action = (
-                  <p className="flex items-center justify-center gap-1.5 rounded-full bg-sage-100 py-3 text-sm font-bold text-sage-800">
-                    <CheckCircle2 className="h-4 w-4 text-sage-600" />
+                  <p className="flex items-center justify-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 py-3 text-sm font-bold text-emerald-800">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                     Você votou {mine === 'favor' ? 'a favor' : 'contra'}
                   </p>
                 );
@@ -205,7 +205,7 @@ export const ProcessesSection: React.FC<ProcessesSectionProps> = ({ userProcesse
                     <button
                       type="button"
                       onClick={() => vote(item.id, 'favor')}
-                      className="inline-flex items-center justify-center gap-1.5 rounded-full border-2 border-sage-600 bg-white py-2.5 text-xs font-bold text-sage-800 hover:bg-sage-50 cursor-pointer"
+                      className="inline-flex items-center justify-center gap-1.5 rounded-full border-2 border-emerald-600 bg-white py-2.5 text-xs font-bold text-emerald-800 hover:bg-emerald-50 cursor-pointer"
                     >
                       <ThumbsUp className="h-3.5 w-3.5" /> A favor
                     </button>
@@ -223,7 +223,7 @@ export const ProcessesSection: React.FC<ProcessesSectionProps> = ({ userProcesse
                   <button
                     type="button"
                     onClick={() => setVotingOpen(item.id)}
-                    className="w-full rounded-full border border-earth-300 bg-white py-3 text-sm font-bold text-earth-800 transition-all hover:bg-cream-100 cursor-pointer"
+                    className="w-full rounded-full border border-zinc-300 bg-white py-3 text-sm font-bold text-zinc-900 transition-all hover:bg-zinc-100 cursor-pointer"
                   >
                     Votar nesta Lei
                   </button>
@@ -236,20 +236,20 @@ export const ProcessesSection: React.FC<ProcessesSectionProps> = ({ userProcesse
               indicator = (
                 <div>
                   <div className="flex justify-between text-xs font-semibold">
-                    <span className="flex items-center gap-1 text-earth-800 font-bold">
-                      <Users className="h-3.5 w-3.5 text-terracotta-500" />
+                    <span className="flex items-center gap-1 text-zinc-900 font-bold">
+                      <Users className="h-3.5 w-3.5 text-crimson-600" />
                       {formatNumber(supporters)} apoios
                     </span>
                     {item.goal ? (
-                      <span className="text-earth-500">meta de {formatNumber(item.goal)}</span>
+                      <span className="text-zinc-500">meta de {formatNumber(item.goal)}</span>
                     ) : (
-                      <span className="text-earth-500">moradores afetados</span>
+                      <span className="text-zinc-500">moradores afetados</span>
                     )}
                   </div>
                   {pct !== null && (
-                    <div className="mt-1.5 h-2.5 overflow-hidden rounded-full bg-cream-200">
+                    <div className="mt-1.5 h-2.5 overflow-hidden rounded-full bg-zinc-200">
                       <div
-                        className="h-full rounded-full bg-gradient-to-r from-terracotta-400 to-terracotta-500 transition-all duration-500"
+                        className="h-full rounded-full bg-gradient-to-r from-crimson-500 to-crimson-600 transition-all duration-500"
                         style={{ width: `${pct}%` }}
                       />
                     </div>
@@ -258,8 +258,8 @@ export const ProcessesSection: React.FC<ProcessesSectionProps> = ({ userProcesse
               );
 
               action = mine ? (
-                <p className="flex items-center justify-center gap-1.5 rounded-full bg-sage-100 py-3 text-sm font-bold text-sage-800">
-                  <CheckCircle2 className="h-4 w-4 text-sage-600" />
+                <p className="flex items-center justify-center gap-1.5 rounded-full bg-crimson-50 border border-crimson-200 py-3 text-sm font-bold text-crimson-800">
+                  <CheckCircle2 className="h-4 w-4 text-crimson-600" />
                   {item.category === 'peticao' ? 'Você assinou' : 'Você está cobrando junto'}
                 </p>
               ) : (
@@ -268,8 +268,8 @@ export const ProcessesSection: React.FC<ProcessesSectionProps> = ({ userProcesse
                   onClick={() => support(item.id)}
                   className={`w-full rounded-full py-3 text-sm font-bold transition-all cursor-pointer ${
                     item.category === 'peticao'
-                      ? 'bg-terracotta-500 text-white shadow-hoperise-btn hover:bg-terracotta-600'
-                      : 'border border-earth-300 bg-white text-earth-800 hover:bg-cream-100'
+                      ? 'bg-crimson-600 text-white shadow-crimson-btn hover:bg-crimson-700'
+                      : 'border border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-100'
                   }`}
                 >
                   {item.category === 'peticao' ? 'Apoiar Causa' : 'Cobrar Zeladoria'}
@@ -280,7 +280,7 @@ export const ProcessesSection: React.FC<ProcessesSectionProps> = ({ userProcesse
             return (
               <article
                 key={item.id}
-                className="flex flex-col justify-between rounded-3xl border border-[#EAE3D6] bg-white p-6 shadow-hoperise-card transition-all hover:shadow-hoperise-hover"
+                className="flex flex-col justify-between rounded-3xl border border-zinc-200 bg-white p-6 shadow-civic-card transition-all hover:shadow-civic-hover"
               >
                 <div>
                   <div className="flex items-center justify-between gap-2">
@@ -290,22 +290,22 @@ export const ProcessesSection: React.FC<ProcessesSectionProps> = ({ userProcesse
                       <Icon className="h-3 w-3" />
                       {CATEGORY_LABEL[item.category]}
                     </span>
-                    <span className="flex items-center gap-1 text-xs font-medium text-earth-500">
-                      <MapPin className="h-3 w-3 text-earth-400" />
+                    <span className="flex items-center gap-1 text-xs font-medium text-zinc-500">
+                      <MapPin className="h-3 w-3 text-zinc-400" />
                       {item.location}
                     </span>
                   </div>
 
-                  <h3 className="mt-3.5 font-display text-lg font-extrabold leading-snug text-earth-900">
+                  <h3 className="mt-3.5 font-display text-lg font-extrabold leading-snug text-zinc-950">
                     {item.title}
                   </h3>
 
-                  <p className="mt-2 text-sm leading-relaxed text-earth-600">
+                  <p className="mt-2 text-sm leading-relaxed text-zinc-600">
                     {item.summary}
                   </p>
                 </div>
 
-                <div className="mt-6 border-t border-cream-200 pt-4">
+                <div className="mt-6 border-t border-zinc-100 pt-4">
                   {indicator}
                   <div className="mt-4">{action}</div>
                 </div>

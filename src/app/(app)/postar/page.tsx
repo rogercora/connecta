@@ -168,7 +168,7 @@ export default function PostarPage() {
   if (protocoloGerado) {
     return (
       <div className="p-6 text-center space-y-4 max-w-md mx-auto min-h-screen bg-white">
-        <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+        <div className="w-16 h-16 bg-crimson-100 text-crimson-600 rounded-full flex items-center justify-center mx-auto">
           <CheckCircle2 className="w-10 h-10" />
         </div>
 
@@ -176,12 +176,12 @@ export default function PostarPage() {
           Zeladoria Registrada com Sucesso!
         </h2>
 
-        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-1.5 text-left">
-          <p className="text-xs text-emerald-800 font-bold">Número de Protocolo Oficial:</p>
-          <p className="text-2xl font-black text-emerald-700 tracking-wider">
+        <div className="p-4 bg-crimson-50 border border-crimson-200 rounded-2xl space-y-1.5 text-left">
+          <p className="text-xs text-crimson-800 font-bold">Número de Protocolo Oficial:</p>
+          <p className="text-2xl font-black text-crimson-700 tracking-wider">
             {protocoloGerado}
           </p>
-          <p className="text-[11px] text-emerald-800 leading-snug">
+          <p className="text-[11px] text-crimson-800 leading-snug">
             Encaminhado automaticamente para a triagem da central de zeladoria municipal de <strong>{user?.cidade || 'São José dos Campos'}</strong>.
           </p>
         </div>
@@ -195,7 +195,7 @@ export default function PostarPage() {
 
         <Button
           variant="primary"
-          className="w-full rounded-xl py-3 font-bold bg-emerald-600 hover:bg-emerald-700 text-white"
+          className="w-full rounded-xl py-3 font-bold bg-crimson-600 hover:bg-crimson-700 text-white shadow-crimson-btn"
           onClick={() => router.push('/feed')}
         >
           Ver no Feed do Bairro
@@ -227,7 +227,7 @@ export default function PostarPage() {
 
         <div
           onClick={() => fileInputRef.current?.click()}
-          className="w-full aspect-[16/9] rounded-2xl border-2 border-dashed border-gray-300 bg-gray-50 flex flex-col items-center justify-center text-gray-500 overflow-hidden relative cursor-pointer hover:border-emerald-500 transition-colors group"
+          className="w-full aspect-[16/9] rounded-2xl border-2 border-dashed border-gray-300 bg-gray-50 flex flex-col items-center justify-center text-gray-500 overflow-hidden relative cursor-pointer hover:border-crimson-500 transition-colors group"
         >
           {fotoPreview || fotoUrl ? (
             <div className="relative w-full h-full">
@@ -244,7 +244,7 @@ export default function PostarPage() {
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center p-4 text-center">
-              <Camera className="w-8 h-8 text-emerald-600 mb-1" />
+              <Camera className="w-8 h-8 text-crimson-600 mb-1" />
               <span className="text-xs font-bold text-gray-700">Tirar foto ou carregar da galeria</span>
               <span className="text-[10px] text-gray-400">Geolocalização anexada automaticamente</span>
             </div>
@@ -274,7 +274,7 @@ export default function PostarPage() {
                 }}
                 className={`py-2 px-3 text-xs font-semibold rounded-xl border text-left transition-all ${
                   categoria === cat.id
-                    ? 'border-emerald-500 bg-emerald-50 text-emerald-800 ring-1 ring-emerald-500 font-bold'
+                    ? 'border-crimson-600 bg-crimson-50 text-crimson-900 ring-1 ring-crimson-600 font-bold'
                     : 'border-gray-200 text-gray-700 hover:bg-gray-50'
                 }`}
               >
@@ -305,7 +305,7 @@ export default function PostarPage() {
               <button
                 type="button"
                 onClick={handleApoiarExistente}
-                className="w-full py-2.5 px-3 bg-emerald-600 text-white rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 hover:bg-emerald-700 active:scale-95 transition-all shadow-sm"
+                className="w-full py-2.5 px-3 bg-crimson-600 text-white rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 hover:bg-crimson-700 active:scale-95 transition-all shadow-crimson-btn"
               >
                 <Megaphone className="w-3.5 h-3.5" />
                 <span>Dar +1 no chamado existente</span>
@@ -332,13 +332,13 @@ export default function PostarPage() {
             value={descricao}
             onChange={(e) => setDescricao(e.target.value)}
             placeholder="Ex: Esse buraco em frente ao número 340 está aumentando após as chuvas e danificando carros..."
-            className="w-full p-3 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+            className="w-full p-3 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-crimson-600 focus:outline-none"
           />
         </div>
 
         {/* Bairro vinculado */}
         <div className="flex items-center space-x-2 text-xs text-gray-600 bg-gray-50 p-3 rounded-xl border border-gray-200">
-          <MapPin className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+          <MapPin className="w-4 h-4 text-crimson-600 flex-shrink-0" />
           <span>
             Vinculado ao bairro <strong>{user?.bairro || 'Jardim Aquárius'}</strong> - {user?.cidade || 'São José dos Campos'} ({user?.cep || '12246-021'})
           </span>
@@ -347,7 +347,7 @@ export default function PostarPage() {
         <Button
           type="submit"
           variant="primary"
-          className="w-full rounded-xl py-3 font-bold bg-emerald-600 hover:bg-emerald-700 text-white"
+          className="w-full rounded-xl py-3 font-bold bg-crimson-600 hover:bg-crimson-700 text-white shadow-crimson-btn"
           isLoading={loading}
         >
           Publicar e Gerar Protocolo Oficial

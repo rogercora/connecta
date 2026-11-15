@@ -1,5 +1,5 @@
 // ============================================================
-// Connecta — Prompt System para LLM (Claude / Gemini)
+// ConectaBr — Prompt System para LLM (Claude / Gemini)
 // Ingestão e Sumarização Neutra de Diários Oficiais (Multi-Pautas)
 // ============================================================
 
@@ -28,7 +28,7 @@ export interface PautaIASummarized {
 }
 
 export const SYSTEM_SUMMARIZER_PROMPT = `
-Você é o motor de inteligência cívica da plataforma "Connecta".
+Você é o motor de inteligência cívica da plataforma "ConectaBr".
 Sua missão é analisar Diários Oficiais e Atas Municipais brasileiros e extrair exclusivamente matérias com impacto prático na vida dos cidadãos ou no orçamento público municipal.
 
 DIRETRIZES FUNDAMENTAIS:
@@ -105,7 +105,7 @@ export interface PeticaoInput {
 
 export function buildPeticaoPrompt(input: PeticaoInput): string {
   const acao = input.tipo_consenso === 'discordar' ? 'REJEIÇÃO / REVISÃO' : 'APROVAÇÃO / APOIO';
-  
+
   return `
 Você é um consultor legislativo e cívico especializado em Direito Público e peticionamento popular.
 Gere a minuta formal de um "Abaixo-Assinado Digital Comunitário" fundamentado no Art. 5º, XXXIV da Constituição Federal (direito de petição).
@@ -123,7 +123,7 @@ A minuta deve conter:
 2. Dos Fatos e da Mobilização Popular no Bairro ${input.bairro}.
 3. Da Fundamentação da Manifestação dos Moradores.
 4. Dos Pedidos (audiência pública, suspensão da tramitação ou emenda modificativa).
-5. Certificação digital do quórum de cidadãos auditados pela plataforma Connecta.
+5. Certificação digital do quórum de cidadãos auditados pela plataforma ConectaBr.
 `.trim();
 }
 

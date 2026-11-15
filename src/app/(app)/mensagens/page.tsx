@@ -15,7 +15,7 @@ export default function MensagensPage() {
 
       <div className="divide-y divide-gray-100 bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
         <div className="p-3.5 flex items-center space-x-3 hover:bg-gray-50 cursor-pointer">
-          <div className="w-11 h-11 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-sm">
+          <div className="w-11 h-11 rounded-full bg-crimson-100 text-crimson-700 flex items-center justify-center font-bold text-sm">
             CS
           </div>
           <div className="flex-1 min-w-0">
