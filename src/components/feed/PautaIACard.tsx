@@ -74,10 +74,10 @@ export const PautaIACard: React.FC<PautaIACardProps> = ({ pauta }) => {
           <button
             onClick={handleConcordar}
             disabled={hasVoted}
-            className={`flex items-center justify-center space-x-1.5 py-3 px-3 rounded-full font-black text-xs transition-all shadow-sm cursor-pointer ${
+            className={`flex items-center justify-center space-x-1.5 py-3 px-3 rounded-full font-black text-xs transition-all shadow-crimson-btn cursor-pointer ${
               userVote === 'concordar'
-                ? 'bg-emerald-700 text-white ring-2 ring-emerald-500'
-                : 'bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95'
+                ? 'bg-crimson-800 text-white ring-2 ring-crimson-500'
+                : 'bg-crimson-600 hover:bg-crimson-700 text-white active:scale-95'
             } ${hasVoted && userVote !== 'concordar' ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             <Check className="w-4 h-4 stroke-[3]" />
@@ -89,7 +89,7 @@ export const PautaIACard: React.FC<PautaIACardProps> = ({ pauta }) => {
             disabled={hasVoted}
             className={`flex items-center justify-center space-x-1.5 py-3 px-3 rounded-full font-black text-xs transition-all shadow-sm cursor-pointer ${
               userVote === 'discordar'
-                ? 'bg-red-800 text-white ring-2 ring-red-500'
+                ? 'bg-zinc-800 text-white ring-2 ring-zinc-500'
                 : 'bg-zinc-950 hover:bg-zinc-800 text-white active:scale-95'
             } ${hasVoted && userVote !== 'discordar' ? 'opacity-50 cursor-not-allowed' : ''}`}
           >

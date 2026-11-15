@@ -182,20 +182,20 @@ export const ProcessesSection: React.FC<ProcessesSectionProps> = ({ userProcesse
               indicator = (
                 <div>
                   <div className="flex justify-between text-xs font-semibold">
-                    <span className="text-emerald-700">{pctFavor}% a favor</span>
+                    <span className="text-crimson-700 font-bold">{pctFavor}% a favor</span>
                     <span className="text-zinc-500">{formatNumber(favor + contra)} votos da cidade</span>
                   </div>
                   <div className="mt-1.5 flex h-2.5 overflow-hidden rounded-full bg-zinc-200">
-                    <div className="bg-emerald-600 transition-all duration-500" style={{ width: `${pctFavor}%` }} />
-                    <div className="bg-red-500 transition-all duration-500" style={{ width: `${100 - pctFavor}%` }} />
+                    <div className="bg-crimson-600 transition-all duration-500" style={{ width: `${pctFavor}%` }} />
+                    <div className="bg-zinc-800 transition-all duration-500" style={{ width: `${100 - pctFavor}%` }} />
                   </div>
                 </div>
               );
 
               if (mine) {
                 action = (
-                  <p className="flex items-center justify-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 py-3 text-sm font-bold text-emerald-800">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  <p className="flex items-center justify-center gap-1.5 rounded-full bg-crimson-50 border border-crimson-200 py-3 text-sm font-bold text-crimson-800">
+                    <CheckCircle2 className="h-4 w-4 text-crimson-600" />
                     Você votou {mine === 'favor' ? 'a favor' : 'contra'}
                   </p>
                 );
@@ -205,14 +205,14 @@ export const ProcessesSection: React.FC<ProcessesSectionProps> = ({ userProcesse
                     <button
                       type="button"
                       onClick={() => vote(item.id, 'favor')}
-                      className="inline-flex items-center justify-center gap-1.5 rounded-full border-2 border-emerald-600 bg-white py-2.5 text-xs font-bold text-emerald-800 hover:bg-emerald-50 cursor-pointer"
+                      className="inline-flex items-center justify-center gap-1.5 rounded-full border-2 border-crimson-600 bg-crimson-600 py-2.5 text-xs font-bold text-white hover:bg-crimson-700 shadow-crimson-btn cursor-pointer"
                     >
                       <ThumbsUp className="h-3.5 w-3.5" /> A favor
                     </button>
                     <button
                       type="button"
                       onClick={() => vote(item.id, 'contra')}
-                      className="inline-flex items-center justify-center gap-1.5 rounded-full border-2 border-red-500 bg-white py-2.5 text-xs font-bold text-red-700 hover:bg-red-50 cursor-pointer"
+                      className="inline-flex items-center justify-center gap-1.5 rounded-full border-2 border-zinc-900 bg-zinc-900 py-2.5 text-xs font-bold text-white hover:bg-zinc-800 cursor-pointer"
                     >
                       <ThumbsDown className="h-3.5 w-3.5" /> Contra
                     </button>

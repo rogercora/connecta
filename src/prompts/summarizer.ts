@@ -105,7 +105,7 @@ export interface PeticaoInput {
 
 export function buildPeticaoPrompt(input: PeticaoInput): string {
   const acao = input.tipo_consenso === 'discordar' ? 'REJEIÇÃO / REVISÃO' : 'APROVAÇÃO / APOIO';
-
+  
   return `
 Você é um consultor legislativo e cívico especializado em Direito Público e peticionamento popular.
 Gere a minuta formal de um "Abaixo-Assinado Digital Comunitário" fundamentado no Art. 5º, XXXIV da Constituição Federal (direito de petição).

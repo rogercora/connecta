@@ -15,10 +15,10 @@ export const ConectaBrLogo: React.FC<{ className?: string; inverted?: boolean }>
 }) => (
   <span className={`inline-flex items-center gap-3 ${className}`}>
     <span
-      className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl shadow-sm transition-transform hover:scale-105 ${
+      className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl shadow-xs transition-transform hover:scale-105 ${
         inverted
           ? 'bg-zinc-900 border border-zinc-800'
-          : 'bg-gradient-to-br from-zinc-950 to-zinc-900 border border-zinc-800'
+          : 'bg-white border border-zinc-200 shadow-xs'
       }`}
     >
       <svg viewBox="0 0 40 40" className="h-6 w-6" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -26,12 +26,18 @@ export const ConectaBrLogo: React.FC<{ className?: string; inverted?: boolean }>
         <path
           d="M 12 16 L 22 12 L 22 28 L 12 24 Z"
           fill="#E11D48"
-          stroke="#E11D48"
+          stroke="#BE123C"
           strokeWidth="1.5"
           strokeLinejoin="round"
         />
-        <rect x="8" y="17" width="5" height="6" rx="1.5" fill="#FFFFFF" />
-        <path d="M 14 24 L 16 30 L 19 30 L 17 24" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round" />
+        <rect x="8" y="17" width="5" height="6" rx="1.5" fill={inverted ? '#FFFFFF' : '#18181B'} />
+        <path
+          d="M 14 24 L 16 30 L 19 30 L 17 24"
+          stroke={inverted ? '#FFFFFF' : '#18181B'}
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
         {/* Ondas sonoras de pressão popular */}
         <path d="M 26 14 A 9 9 0 0 1 26 26" stroke="#E11D48" strokeWidth="2.5" strokeLinecap="round" />
         <path d="M 30 11 A 14 14 0 0 1 30 29" stroke="#FB7185" strokeWidth="2.2" strokeLinecap="round" />

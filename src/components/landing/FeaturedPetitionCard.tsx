@@ -83,11 +83,10 @@ export const FeaturedPetitionCard: React.FC = () => {
           {(signed ? ['VC', ...RECENT_SIGNERS.slice(0, 4)] : RECENT_SIGNERS).map((initials, i) => (
             <span
               key={`${initials}-${i}`}
-              className={`flex h-8 w-8 items-center justify-center rounded-full border-2 border-white text-[11px] font-bold shadow-xs ${
-                initials === 'VC'
-                  ? 'bg-crimson-600 text-white'
-                  : 'bg-zinc-200 text-zinc-800'
-              }`}
+              className={`flex h-8 w-8 items-center justify-center rounded-full border-2 border-white text-[11px] font-bold shadow-xs ${initials === 'VC'
+                ? 'bg-crimson-600 text-white'
+                : 'bg-zinc-200 text-zinc-800'
+                }`}
             >
               {initials}
             </span>

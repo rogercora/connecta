@@ -26,15 +26,15 @@ export const BottomNav: React.FC = () => {
 
           if (item.isCenterButton) {
             return (
-              <div key={item.label} className="flex flex-col items-center justify-center -mt-5">
+              <div key={item.label} className="flex flex-col items-center justify-center -mt-6">
                 <a
                   href={item.href}
-                  className="w-13 h-13 rounded-full bg-crimson-600 hover:bg-crimson-700 active:scale-95 text-white flex items-center justify-center shadow-crimson-btn transition-transform border-4 border-white"
+                  className="w-14 h-14 rounded-full bg-crimson-600 hover:bg-crimson-700 active:scale-95 text-white flex items-center justify-center shadow-lg shadow-crimson-600/40 transition-transform border-4 border-white cursor-pointer"
                   aria-label="Cobrar zeladoria ou postar"
                 >
-                  <Icon className="w-6 h-6 stroke-[2.2] text-white" />
+                  <Icon className="w-6 h-6 stroke-[2.4] text-white" />
                 </a>
-                <span className="text-[10px] font-bold text-crimson-700 mt-0.5">
+                <span className="text-[11px] font-black text-crimson-700 mt-0.5 tracking-tight">
                   {item.label}
                 </span>
               </div>
