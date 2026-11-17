@@ -2,16 +2,12 @@ import { cookies } from 'next/headers';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-function getRequiredPublicEnv() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const DEFAULT_SUPABASE_URL = 'https://fjtbdoeahdtellzbxpsy.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_3TfAipTG33KDBTbsgzP9oQ_aDipKcny';
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error(
-      'Variáveis NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY não configuradas no servidor.'
-    );
-  }
-
+function getPublicSupabaseEnv() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
   return { supabaseUrl, supabaseAnonKey };
 }
 
@@ -19,7 +15,7 @@ function getRequiredPublicEnv() {
  * Cliente Supabase autenticado via cookies da requisição atual (SSR / Route Handlers).
  */
 export async function createSupabaseServerClient(): Promise<SupabaseClient> {
-  const { supabaseUrl, supabaseAnonKey } = getRequiredPublicEnv();
+  const { supabaseUrl, supabaseAnonKey } = getPublicSupabaseEnv();
   const cookieStore = await cookies();
 
   return createServerClient(supabaseUrl, supabaseAnonKey, {
@@ -48,12 +44,12 @@ let cachedAdminClient: SupabaseClient | null = null;
 export function getSupabaseAdmin(): SupabaseClient {
   if (cachedAdminClient) return cachedAdminClient;
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!supabaseUrl || !serviceRoleKey) {
+  if (!serviceRoleKey) {
     throw new Error(
-      'SUPABASE_SERVICE_ROLE_KEY ou NEXT_PUBLIC_SUPABASE_URL ausente no ambiente do servidor.'
+      'SUPABASE_SERVICE_ROLE_KEY ausente nas variáveis de ambiente do servidor.'
     );
   }
 

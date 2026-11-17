@@ -3,16 +3,13 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 let browserClient: SupabaseClient | null = null;
 
+// URL pública e chave publishable (não-secretas) mantidas como fallback seguro para deploys sem env explícita
+const DEFAULT_SUPABASE_URL = 'https://fjtbdoeahdtellzbxpsy.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_3TfAipTG33KDBTbsgzP9oQ_aDipKcny';
+
 function getSupabaseConfig() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error(
-      'Variáveis NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY não configuradas.'
-    );
-  }
-
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
   return { supabaseUrl, supabaseAnonKey };
 }
 
@@ -26,7 +23,6 @@ export function getSupabaseBrowserClient(): SupabaseClient {
 
 /**
  * Cliente browser singleton (compatível com cookies SSR via @supabase/ssr).
- * Inicializa preguiçosamente no primeiro acesso para não falhar em prerenders estáticos sem env.
  */
 export const supabase: SupabaseClient = new Proxy({} as SupabaseClient, {
   get(_target, prop, receiver) {

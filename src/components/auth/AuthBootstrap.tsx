@@ -13,35 +13,44 @@ export function AuthBootstrap() {
   useEffect(() => {
     void refreshProfile();
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'INITIAL_SESSION') {
-        return;
-      }
+    let unsubscribe: (() => void) | undefined;
 
-      if (event === 'SIGNED_OUT') {
-        setUser(null);
-        queryClient.clear();
-        return;
-      }
-
-      if (event === 'SIGNED_IN') {
-        const currentId = useAuthStore.getState().user?.id;
-        if (currentId && session?.user?.id === currentId) {
+    try {
+      const {
+        data: { subscription },
+      } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'INITIAL_SESSION') {
           return;
         }
-        void refreshProfile();
-        return;
-      }
 
-      if (event === 'USER_UPDATED') {
-        void refreshProfile();
-      }
-    });
+        if (event === 'SIGNED_OUT') {
+          setUser(null);
+          queryClient.clear();
+          return;
+        }
+
+        if (event === 'SIGNED_IN') {
+          const currentId = useAuthStore.getState().user?.id;
+          if (currentId && session?.user?.id === currentId) {
+            return;
+          }
+          void refreshProfile();
+          return;
+        }
+
+        if (event === 'USER_UPDATED') {
+          void refreshProfile();
+        }
+      });
+
+      unsubscribe = () => subscription.unsubscribe();
+    } catch (err) {
+      console.warn('Falha ao inicializar listener de autenticação:', err);
+      useAuthStore.getState().setLoading(false);
+    }
 
     return () => {
-      subscription.unsubscribe();
+      unsubscribe?.();
     };
   }, [refreshProfile, setUser, queryClient]);
 

@@ -11,12 +11,10 @@ function hasSupabaseAuthCookie(request: NextRequest): boolean {
 }
 
 export async function middleware(request: NextRequest) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    return NextResponse.next();
-  }
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://fjtbdoeahdtellzbxpsy.supabase.co';
+  const supabaseAnonKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_3TfAipTG33KDBTbsgzP9oQ_aDipKcny';
 
   const { pathname } = request.nextUrl;
   const hasCookie = hasSupabaseAuthCookie(request);
