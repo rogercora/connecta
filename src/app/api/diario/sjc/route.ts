@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireAdminUser } from '@/lib/auth/serverAuth';
 
 export interface EdicaoSJC {
   id: number;
@@ -18,49 +19,59 @@ const MATERIAS_DESTAQUE = [
     titulo_destaque: 'Projeto de Lei Complementar: Diretrizes de Uso do Solo e Zoneamento',
     bairro_sugerido: 'Jardim Aquárius',
     secretaria: 'Secretaria de Urbanismo e Sustentabilidade',
-    texto_resumo: 'Altera parâmetros construtivos e incentiva novos empreendimentos comerciais de médio impacto na Av. Cassiano Ricardo com exigência de Relatório de Impacto de Vizinhança.',
+    texto_resumo:
+      'Altera parâmetros construtivos e incentiva novos empreendimentos comerciais de médio impacto na Av. Cassiano Ricardo com exigência de Relatório de Impacto de Vizinhança.',
   },
   {
     titulo_destaque: 'Decreto Municipal: Reajuste e Lançamento da Planta Genérica do IPTU',
     bairro_sugerido: 'Bosque dos Eucaliptos',
     secretaria: 'Secretaria de Gestão Financeira',
-    texto_resumo: 'Regulamenta os critérios de atualização cadastral e cobrança do IPTU para lotes residenciais e comerciais nos bairros da Zona Sul (Bosque dos Eucaliptos e Satélite).',
+    texto_resumo:
+      'Regulamenta os critérios de atualização cadastral e cobrança do IPTU para lotes residenciais e comerciais nos bairros da Zona Sul (Bosque dos Eucaliptos e Satélite).',
   },
   {
     titulo_destaque: 'Edital de Obras: Recapeamento Asfáltico e Drenagem Pluvial',
     bairro_sugerido: 'Santana',
     secretaria: 'Secretaria de Obras e Serviços Municipais',
-    texto_resumo: 'Contratação emergencial de serviços de recapeamento asfáltico, contenção de encostas e drenagem na Zona Norte para prevenção de alagamentos no período de chuvas.',
+    texto_resumo:
+      'Contratação emergencial de serviços de recapeamento asfáltico, contenção de encostas e drenagem na Zona Norte para prevenção de alagamentos no período de chuvas.',
   },
   {
     titulo_destaque: 'Reestruturação de Linhas e Itinerários de Transporte Coletivo',
     bairro_sugerido: 'Urbanova',
     secretaria: 'Secretaria de Mobilidade Urbana',
-    texto_resumo: 'Criação de novos horários e itinerário expresso entre a Avenida Shishima Hifumi (Urbanova) e a região central para desafogar o tráfego nos horários de pico.',
+    texto_resumo:
+      'Criação de novos horários e itinerário expresso entre a Avenida Shishima Hifumi (Urbanova) e a região central para desafogar o tráfego nos horários de pico.',
   },
   {
     titulo_destaque: 'Programa de Atendimento Noturno e Especialidades nas UBSs',
     bairro_sugerido: 'Eugênio de Melo',
     secretaria: 'Secretaria de Saúde',
-    texto_resumo: 'Ampliação do horário de atendimento da UBS de Eugênio de Melo e reforço nas equipes de saúde da família para atendimento aos fins de semana.',
+    texto_resumo:
+      'Ampliação do horário de atendimento da UBS de Eugênio de Melo e reforço nas equipes de saúde da família para atendimento aos fins de semana.',
   },
   {
     titulo_destaque: 'Revitalização e Segurança no Polo Comercial do Centro',
     bairro_sugerido: 'Centro',
     secretaria: 'Secretaria de Proteção ao Cidadão',
-    texto_resumo: 'Instalação de novas câmeras do sistema CSI (Centro de Segurança e Inteligência) e reforço no policiamento preventivo nas ruas comerciais do Centro histórico.',
+    texto_resumo:
+      'Instalação de novas câmeras do sistema CSI (Centro de Segurança e Inteligência) e reforço no policiamento preventivo nas ruas comerciais do Centro histórico.',
   },
 ];
 
 export async function GET() {
   try {
-    // 1. Conecta ao portal oficial do Diário do Município de São José dos Campos
+    const auth = await requireAdminUser();
+    if (!auth.ok) return auth.response;
+
     const response = await fetch('https://diariodomunicipio.sjc.sp.gov.br', {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml',
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        Accept: 'text/html,application/xhtml+xml',
       },
-      next: { revalidate: 3600 }, // Cache de 1 hora
+      next: { revalidate: 3600 },
+      signal: AbortSignal.timeout(4000),
     });
 
     if (response.ok) {
@@ -97,7 +108,6 @@ export async function GET() {
       }
     }
 
-    // Fallback resiliente com as edições oficiais mais recentes de SJC caso o portal da prefeitura oscile
     const fallbackEdicoes: EdicaoSJC[] = [
       {
         id: 2870,
@@ -142,7 +152,7 @@ export async function GET() {
       edicoes: fallbackEdicoes,
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Erro em GET /api/diario/sjc:', error?.message);
+    return NextResponse.json({ error: 'Erro ao consultar Diário Oficial de SJC.' }, { status: 500 });
   }
 }
-

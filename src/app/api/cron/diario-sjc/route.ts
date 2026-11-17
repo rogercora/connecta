@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase/server';
+import { requireAdminUser } from '@/lib/auth/serverAuth';
+import { getSupabaseAdmin } from '@/lib/supabase/server';
 
 interface EdicaoMateria {
   titulo_destaque: string;
@@ -58,9 +59,9 @@ async function executarRotinaCron(origem: 'vercel_cron' | 'manual_admin') {
   const logs: string[] = [];
   logs.push(`[${timestampInicio}] Iniciando rotina noturna de mineração cívica de São José dos Campos.`);
 
+  const supabaseAdmin = getSupabaseAdmin();
   let edicoesReais: any[] = [];
 
-  // 1. Consulta o portal do Diário Oficial de SJC
   try {
     const response = await fetch('https://diariodomunicipio.sjc.sp.gov.br', {
       headers: {
@@ -68,6 +69,7 @@ async function executarRotinaCron(origem: 'vercel_cron' | 'manual_admin') {
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         Accept: 'text/html,application/xhtml+xml',
       },
+      signal: AbortSignal.timeout(10000),
     });
 
     if (response.ok) {
@@ -83,7 +85,6 @@ async function executarRotinaCron(origem: 'vercel_cron' | 'manual_admin') {
     logs.push(`Aviso ao conectar no portal oficial: ${err.message}. Usando contingência estruturada.`);
   }
 
-  // Fallback caso portal esteja instável na madrugada
   if (edicoesReais.length === 0) {
     const hoje = new Date().toISOString().split('T')[0];
     edicoesReais = [
@@ -101,7 +102,6 @@ async function executarRotinaCron(origem: 'vercel_cron' | 'manual_admin') {
   const edicaoMaisRecente = edicoesReais[0];
   const fonteDiarioNome = `Diário Oficial de SJC - Ed. ${edicaoMaisRecente.numero}`;
 
-  // 2. Verifica se a edição já foi minerada anteriormente no Supabase
   let jaProcessada = false;
   try {
     const { data: existentes } = await supabaseAdmin
@@ -118,7 +118,6 @@ async function executarRotinaCron(origem: 'vercel_cron' | 'manual_admin') {
     logs.push(`Aviso ao verificar duplicidade: ${err.message}`);
   }
 
-  // 3. Se não processada (ou se for execução manual de teste), insere as matérias mineradas pela IA
   if (!jaProcessada || origem === 'manual_admin') {
     for (let i = 0; i < MATERIAS_DIARIO_SJC.length; i++) {
       const mat = MATERIAS_DIARIO_SJC[i];
@@ -135,31 +134,26 @@ async function executarRotinaCron(origem: 'vercel_cron' | 'manual_admin') {
           edicaoMaisRecente.download_url ||
           `https://diariodomunicipio.sjc.sp.gov.br/portal/edicoes/download/${edicaoMaisRecente.id || 3424}`,
         fonte_diario: fonteDiarioNome,
-        status: 'ativa', // Pronta no feed da cidade
+        status: 'ativa',
         data_votacao: new Date(Date.now() + 86400000 * 3).toISOString(),
-        votos_concordar: Math.floor(15 + Math.random() * 45),
-        votos_discordar: Math.floor(3 + Math.random() * 12),
+        votos_concordar: 0,
+        votos_discordar: 0,
       };
 
-      try {
-        const { data, error } = await supabaseAdmin
-          .from('pautas_ia')
-          .insert([novaPauta])
-          .select()
-          .single();
+      const { data, error } = await supabaseAdmin
+        .from('pautas_ia')
+        .insert([novaPauta])
+        .select()
+        .single();
 
-        if (!error && data) {
-          pautasInseridas.push(data);
-        } else {
-          // Se banco estiver indisponível no sandbox, guarda local
-          pautasInseridas.push({ ...novaPauta, id: `pauta-cron-${Date.now()}-${i}` });
-        }
-      } catch (e: any) {
-        pautasInseridas.push({ ...novaPauta, id: `pauta-cron-${Date.now()}-${i}` });
+      if (!error && data) {
+        pautasInseridas.push(data);
+      } else {
+        logs.push(`Erro ao gravar matéria "${mat.titulo_destaque}": ${error?.message}`);
       }
     }
 
-    logs.push(`Sucesso: ${pautasInseridas.length} novas pautas municipais mineradas e publicadas.`);
+    logs.push(`Sucesso: ${pautasInseridas.length} novas pautas municipais publicadas.`);
   }
 
   return {
@@ -175,35 +169,47 @@ async function executarRotinaCron(origem: 'vercel_cron' | 'manual_admin') {
   };
 }
 
-// GET: Disparado pelo Vercel Cron ou checagem de status
+function hasValidCronSecret(req: Request): boolean {
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) return false;
+  const authHeader = req.headers.get('authorization');
+  return authHeader === `Bearer ${cronSecret}`;
+}
+
+// GET: Disparado exclusivamente pelo Vercel Cron com CRON_SECRET válido
 export async function GET(req: Request) {
   try {
-    const authHeader = req.headers.get('authorization');
-    const cronSecret = process.env.CRON_SECRET;
+    if (!process.env.CRON_SECRET) {
+      return NextResponse.json(
+        { error: 'CRON_SECRET não configurado no servidor.' },
+        { status: 503 }
+      );
+    }
 
-    // Se houver CRON_SECRET configurado, valida a autorização enviada pela Vercel
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-      // Permite também se tiver query param ?manual=true para o painel admin
-      const { searchParams } = new URL(req.url);
-      if (searchParams.get('manual') !== 'true') {
-        return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-      }
+    if (!hasValidCronSecret(req)) {
+      return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
     }
 
     const resultado = await executarRotinaCron('vercel_cron');
     return NextResponse.json(resultado);
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Erro em GET /api/cron/diario-sjc:', error?.message);
+    return NextResponse.json({ error: 'Erro interno ao executar cron.' }, { status: 500 });
   }
 }
 
-// POST: Disparado manualmente pelo Painel Administrativo (/admin)
+// POST: Disparado manualmente apenas por Administradores autenticados (/admin) ou com CRON_SECRET
 export async function POST(req: Request) {
   try {
+    if (!hasValidCronSecret(req)) {
+      const auth = await requireAdminUser();
+      if (!auth.ok) return auth.response;
+    }
+
     const resultado = await executarRotinaCron('manual_admin');
     return NextResponse.json(resultado);
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Erro em POST /api/cron/diario-sjc:', error?.message);
+    return NextResponse.json({ error: 'Erro interno ao executar cron manual.' }, { status: 500 });
   }
 }
-

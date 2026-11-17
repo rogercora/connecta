@@ -24,6 +24,8 @@ export type CategoriaComunidade =
 
 export type StatusPeticao = 'rascunho' | 'aberta' | 'entregue' | 'respondida';
 
+export type UserRole = 'cidadao' | 'admin';
+
 export interface User {
   id: string;
   phone: string | null;
@@ -34,8 +36,10 @@ export interface User {
   bairro: string;
   cidade: string;
   estado: string;
+  codigo_ibge?: string | null;
   coordenadas: { lat: number; lng: number } | null;
   nivel_verificacao: NivelVerificacao;
+  role?: UserRole;
   cpf_hash: string | null;
   created_at: string;
 }

@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { Heart, MessageCircle, Send, Bookmark, MoreVertical, Check, Megaphone, FileText } from 'lucide-react';
 import { PostComunidade } from '@/types/database';
 import { useFeedStore } from '@/stores/feedStore';
@@ -13,6 +15,8 @@ interface PostComunidadeCardProps {
 }
 
 export const PostComunidadeCard: React.FC<PostComunidadeCardProps> = ({ post }) => {
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const [liked, setLiked] = useState(false);
   const curtirPost = useFeedStore((s) => s.curtirPost);
   const toggleApoiarPost = useFeedStore((s) => s.toggleApoiarPost);
@@ -33,26 +37,41 @@ export const PostComunidadeCard: React.FC<PostComunidadeCardProps> = ({ post }) 
   };
 
   const handleToggleAfeta = async () => {
+    if (!currentUser?.id) {
+      router.push('/login?next=/feed');
+      return;
+    }
+
     if (isUpdatingApoio) return;
     setIsUpdatingApoio(true);
 
-    const novoEstado = !apoiado;
-    const novoTotal = novoEstado ? moradoresCount + 1 : Math.max(1, moradoresCount - 1);
+    const estadoAnterior = apoiado;
+    const totalAnterior = moradoresCount;
+    const novoEstado = !estadoAnterior;
+    const novoTotal = novoEstado ? totalAnterior + 1 : Math.max(1, totalAnterior - 1);
 
-    // Otimista na UI
     setApoiado(novoEstado);
     setMoradoresCount(novoTotal);
     toggleApoiarPost(post.id);
 
     try {
-      if (currentUser?.id) {
-        await supabase.rpc('toggle_apoiar_post', {
-          p_post_id: post.id,
-          p_user_id: currentUser.id,
-        });
+      const { data, error } = await supabase.rpc('toggle_apoiar_post', {
+        p_post_id: post.id,
+      });
+
+      if (error) {
+        setApoiado(estadoAnterior);
+        setMoradoresCount(totalAnterior);
+        console.warn('Falha ao registrar apoio:', error.message);
+      } else if (data && typeof data.moradores_afetados === 'number') {
+        setApoiado(Boolean(data.apoiado));
+        setMoradoresCount(data.moradores_afetados);
+        void queryClient.invalidateQueries({ queryKey: ['posts'] });
       }
     } catch (err) {
-      console.warn('Sincronização com Supabase RPC falhou (usando estado local):', err);
+      setApoiado(estadoAnterior);
+      setMoradoresCount(totalAnterior);
+      console.warn('Erro de rede ao sincronizar apoio:', err);
     } finally {
       setIsUpdatingApoio(false);
     }

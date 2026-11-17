@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import Link from 'next/navigation';
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Home, Hand, Camera, MessageCircle, User } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
@@ -27,13 +27,13 @@ export const BottomNav: React.FC = () => {
           if (item.isCenterButton) {
             return (
               <div key={item.label} className="flex flex-col items-center justify-center -mt-6">
-                <a
+                <Link
                   href={item.href}
                   className="w-14 h-14 rounded-full bg-crimson-600 hover:bg-crimson-700 active:scale-95 text-white flex items-center justify-center shadow-lg shadow-crimson-600/40 transition-transform border-4 border-white cursor-pointer"
                   aria-label="Cobrar zeladoria ou postar"
                 >
                   <Icon className="w-6 h-6 stroke-[2.4] text-white" />
-                </a>
+                </Link>
                 <span className="text-[11px] font-black text-crimson-700 mt-0.5 tracking-tight">
                   {item.label}
                 </span>
@@ -42,7 +42,7 @@ export const BottomNav: React.FC = () => {
           }
 
           return (
-            <a
+            <Link
               key={item.label}
               href={item.href}
               className={cn(
@@ -54,7 +54,7 @@ export const BottomNav: React.FC = () => {
             >
               <Icon className={cn('w-5 h-5', isActive ? 'stroke-[2.4]' : 'stroke-[1.8]')} />
               <span className="text-[10px] mt-0.5">{item.label}</span>
-            </a>
+            </Link>
           );
         })}
       </div>

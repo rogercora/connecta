@@ -69,9 +69,8 @@ export function usePautas(
       return (data ?? []) as PautaIA[];
     },
     retry: 1,
-    staleTime: 0, // Sempre atualizado para exibir pautas recém-aprovadas no feed imediatamente
-    refetchOnMount: 'always',
-    refetchOnWindowFocus: true,
+    staleTime: 1000 * 30,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -83,7 +82,7 @@ export function usePosts(feedLevel: FeedLevel, userCidade: string = 'São José 
         .from('posts_comunidade')
         .select(`
           *,
-          user:users(nome_completo, avatar_url, bairro, cidade, estado, nivel_verificacao)
+          user:perfis_publicos(nome_completo, avatar_url, bairro, cidade, estado, nivel_verificacao)
         `)
         .order('created_at', { ascending: false });
 
@@ -103,7 +102,7 @@ export function usePosts(feedLevel: FeedLevel, userCidade: string = 'São José 
           .from('posts_comunidade')
           .select(`
             *,
-            user:users(nome_completo, avatar_url, bairro, cidade, estado, nivel_verificacao)
+            user:perfis_publicos(nome_completo, avatar_url, bairro, cidade, estado, nivel_verificacao)
           `)
           .order('created_at', { ascending: false });
 

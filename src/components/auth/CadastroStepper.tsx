@@ -3,16 +3,43 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { User, Mail, Lock, Phone, MapPin, CheckCircle, ArrowRight, ArrowLeft, Clock } from 'lucide-react';
+import {
+  User,
+  Mail,
+  Lock,
+  Phone,
+  MapPin,
+  CheckCircle,
+  ArrowRight,
+  ArrowLeft,
+  Clock,
+  AlertCircle,
+  CheckCircle2,
+} from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { formatCEP, formatPhone } from '@/lib/utils/formatters';
+import { supabase } from '@/lib/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
+
+function mapSignUpError(message: string): string {
+  const lower = message.toLowerCase();
+  if (lower.includes('already registered') || lower.includes('user already exists')) {
+    return 'Este e-mail já está cadastrado. Tente fazer login.';
+  }
+  if (lower.includes('password should be at least')) {
+    return 'A senha deve ter pelo menos 6 caracteres.';
+  }
+  if (lower.includes('duplicate key value') && lower.includes('phone')) {
+    return 'Este número de celular já está vinculado a outra conta.';
+  }
+  return message;
+}
 
 export const CadastroStepper: React.FC = () => {
   const router = useRouter();
-  const setLocalizacao = useAuthStore((s) => s.setLocalizacao);
+  const refreshProfile = useAuthStore((s) => s.refreshProfile);
   const [step, setStep] = useState<1 | 2>(1);
 
   // Step 1
@@ -24,8 +51,11 @@ export const CadastroStepper: React.FC = () => {
   // Step 2
   const [phone, setPhone] = useState('');
   const [cep, setCep] = useState('');
+  const [aceiteLgpd, setAceiteLgpd] = useState(false);
   const { buscarCEP, endereco, loading: loadingCep } = useGeolocation();
   const [loadingSubmit, setLoadingSubmit] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [awaitingEmailConfirm, setAwaitingEmailConfirm] = useState(false);
   const prefilledCepRef = useRef(false);
 
   useEffect(() => {
@@ -53,8 +83,15 @@ export const CadastroStepper: React.FC = () => {
 
   const handleStep1Next = (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMsg(null);
+
+    if (password.length < 6) {
+      setErrorMsg('A senha deve ter no mínimo 6 caracteres.');
+      return;
+    }
+
     if (password !== confirmPassword) {
-      alert('As senhas digitadas não coincidem.');
+      setErrorMsg('As senhas digitadas não coincidem.');
       return;
     }
     setStep(2);
@@ -62,22 +99,93 @@ export const CadastroStepper: React.FC = () => {
 
   const handleFinalSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoadingSubmit(true);
+    setErrorMsg(null);
 
-    if (endereco) {
-      setLocalizacao({
-        cidade: endereco.localidade || 'São José dos Campos',
-        estado: endereco.uf || 'SP',
-        bairro: endereco.bairro || 'Jardim Aquárius',
-        cep: endereco.cep || cep,
-      });
+    const cepDigitos = cep.replace(/\D/g, '');
+    if (cepDigitos.length !== 8) {
+      setErrorMsg('Informe um CEP válido com 8 dígitos.');
+      return;
     }
 
-    setTimeout(() => {
+    const phoneDigitos = phone.replace(/\D/g, '');
+    if (phoneDigitos.length < 10) {
+      setErrorMsg('Informe um número de celular válido com DDD.');
+      return;
+    }
+
+    if (!aceiteLgpd) {
+      setErrorMsg('É necessário aceitar o uso dos dados geográficos conforme a LGPD.');
+      return;
+    }
+
+    setLoadingSubmit(true);
+
+    try {
+      const cepFormatado = formatCEP(cepDigitos);
+      const cidadeFinal = endereco?.localidade || 'São José dos Campos';
+      const estadoFinal = (endereco?.uf || 'SP').toUpperCase().slice(0, 2);
+      const bairroFinal = endereco?.bairro || 'Centro';
+
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim().toLowerCase(),
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/login`,
+          data: {
+            nome_completo: nome.trim(),
+            phone: phoneDigitos,
+            cep: cepFormatado,
+            bairro: bairroFinal,
+            cidade: cidadeFinal,
+            estado: estadoFinal,
+          },
+        },
+      });
+
+      if (error) {
+        setErrorMsg(mapSignUpError(error.message));
+        setLoadingSubmit(false);
+        return;
+      }
+
+      if (data.session) {
+        await refreshProfile();
+        setLoadingSubmit(false);
+        router.push('/feed');
+        router.refresh();
+        return;
+      }
+
+      // Caso a confirmação por e-mail esteja ativada no projeto Supabase
       setLoadingSubmit(false);
-      router.push('/feed');
-    }, 500);
+      setAwaitingEmailConfirm(true);
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Erro ao criar sua conta. Tente novamente.');
+      setLoadingSubmit(false);
+    }
   };
+
+  if (awaitingEmailConfirm) {
+    return (
+      <div className="w-full max-w-sm mx-auto space-y-5 text-center">
+        <div className="w-14 h-14 bg-crimson-50 border border-crimson-200 text-crimson-600 rounded-full flex items-center justify-center mx-auto">
+          <CheckCircle2 className="w-8 h-8" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-xl font-black text-gray-900">Confirme seu E-mail</h2>
+          <p className="text-xs text-gray-600 leading-relaxed">
+            Enviamos um link de confirmação para <strong>{email}</strong>. Abra o link recebido e depois faça login para acessar seu bairro.
+          </p>
+        </div>
+        <Link
+          href="/login"
+          className="inline-flex items-center justify-center w-full rounded-xl py-3 px-4 font-bold text-xs bg-crimson-600 hover:bg-crimson-700 text-white shadow-crimson-btn"
+        >
+          Ir para o Login
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-sm mx-auto space-y-6">
@@ -101,6 +209,13 @@ export const CadastroStepper: React.FC = () => {
           <div className={`h-1.5 rounded-full transition-all ${step === 2 ? 'w-8 bg-crimson-600' : 'w-4 bg-gray-200'}`} />
         </div>
       </div>
+
+      {errorMsg && (
+        <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs font-medium flex items-start space-x-2">
+          <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+          <span>{errorMsg}</span>
+        </div>
+      )}
 
       {step === 1 ? (
         <form onSubmit={handleStep1Next} className="space-y-4">
@@ -151,7 +266,7 @@ export const CadastroStepper: React.FC = () => {
       ) : (
         <form onSubmit={handleFinalSubmit} className="space-y-4">
           <Input
-            label="Telefone Celular (para validação OTP)"
+            label="Telefone Celular"
             placeholder="(12) 98765-4321"
             value={phone}
             onChange={(e) => setPhone(formatPhone(e.target.value))}
@@ -205,14 +320,29 @@ export const CadastroStepper: React.FC = () => {
 
           <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl text-[11px] text-gray-600 space-y-1">
             <p className="font-bold text-gray-800">Seu nível inicial será: Nível 1</p>
-            <p>Você poderá comentar, curtir e postar zeladoria. A validação de comprovante (Nível 2) poderá ser feita no seu perfil para liberar votos em leis.</p>
+            <p>Você poderá comentar, apoiar e postar zeladoria. A validação Nível 2 é auditada pela moderação para liberar votos em decisões da Câmara.</p>
           </div>
+
+          <label className="flex items-start space-x-2 text-[11px] text-gray-600 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={aceiteLgpd}
+              onChange={(e) => setAceiteLgpd(e.target.checked)}
+              className="mt-0.5 rounded border-gray-300 text-crimson-600 focus:ring-crimson-500"
+            />
+            <span>
+              Concordo com o tratamento de meu e-mail, telefone e CEP exclusivamente para participação cívica local (LGPD).
+            </span>
+          </label>
 
           <div className="flex space-x-2 pt-2">
             <Button
               type="button"
               variant="outline"
-              onClick={() => setStep(1)}
+              onClick={() => {
+                setErrorMsg(null);
+                setStep(1);
+              }}
               className="flex-1 rounded-xl"
             >
               <ArrowLeft className="w-4 h-4 mr-1" />

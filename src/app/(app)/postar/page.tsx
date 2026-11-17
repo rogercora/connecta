@@ -3,31 +3,49 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { Camera, MapPin, CheckCircle2, AlertTriangle, ArrowLeft, Megaphone, Upload, Check } from 'lucide-react';
+import Link from 'next/link';
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  Camera,
+  MapPin,
+  CheckCircle2,
+  AlertTriangle,
+  ArrowLeft,
+  Megaphone,
+  AlertCircle,
+} from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useFeedStore } from '@/stores/feedStore';
 import { useAuthStore } from '@/stores/authStore';
 import { CategoriaComunidade, PostComunidade } from '@/types/database';
 import { supabase } from '@/lib/supabase/client';
+import { usePosts } from '@/hooks/useFeedReal';
 
 export default function PostarPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
+  const isAuthLoading = useAuthStore((s) => s.isLoading);
   const adicionarPost = useFeedStore((s) => s.adicionarPost);
-  const postsComunidade = useFeedStore((s) => s.posts);
   const toggleApoiarPost = useFeedStore((s) => s.toggleApoiarPost);
+
+  const { data: postsReais = [] } = usePosts(
+    'bairro',
+    user?.cidade || 'São José dos Campos',
+    user?.bairro || 'Jardim Aquárius'
+  );
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [categoria, setCategoria] = useState<CategoriaComunidade>('buraco');
   const [descricao, setDescricao] = useState('');
   const [fotoPreview, setFotoPreview] = useState<string | null>(null);
-  const [fotoUrl, setFotoUrl] = useState('https://images.unsplash.com/photo-1578885136359-16c8bd4d3a8e?auto=format&fit=crop&w=800&q=80');
+  const [fotoUrl, setFotoUrl] = useState<string | null>(null);
   const [uploadingFoto, setUploadingFoto] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [protocoloGerado, setProtocoloGerado] = useState<string | null>(null);
 
-  // Anti-duplicação: estado para ignorar aviso caso seja um problema distinto
   const [ignorarDuplicado, setIgnorarDuplicado] = useState(false);
   const [postDuplicado, setPostDuplicado] = useState<PostComunidade | null>(null);
 
@@ -40,12 +58,11 @@ export default function PostarPage() {
     { id: 'outro', label: '⚠️ Outro problema' },
   ];
 
-  // Detector inteligente de chamados duplicados no mesmo bairro/categoria
   useEffect(() => {
-    if (ignorarDuplicado) return;
+    if (ignorarDuplicado || !user?.bairro) return;
 
-    const userBairroClean = (user?.bairro || 'Jardim Aquárius').toLowerCase().trim();
-    const duplicado = postsComunidade.find((p) => {
+    const userBairroClean = user.bairro.toLowerCase().trim();
+    const duplicado = postsReais.find((p) => {
       const postBairroClean = (p.bairro || '').toLowerCase().trim();
       return (
         p.categoria === categoria &&
@@ -54,21 +71,38 @@ export default function PostarPage() {
     });
 
     setPostDuplicado(duplicado || null);
-  }, [categoria, user?.bairro, postsComunidade, ignorarDuplicado]);
+  }, [categoria, user?.bairro, postsReais, ignorarDuplicado]);
 
-  // Upload ou captura de foto
+  // Upload real no bucket zeladoria-fotos (pasta do próprio usuário)
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !user?.id) return;
+
+    setErrorMsg(null);
+
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setErrorMsg('Envie apenas imagens nos formatos JPG, PNG ou WebP.');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMsg('A foto deve ter no máximo 5 MB.');
+      return;
+    }
 
     const localUrl = URL.createObjectURL(file);
     setFotoPreview(localUrl);
     setUploadingFoto(true);
 
     try {
-      const fileExt = file.name.split('.').pop() || 'jpg';
+      const extMap: Record<string, string> = {
+        'image/jpeg': 'jpg',
+        'image/png': 'png',
+        'image/webp': 'webp',
+      };
+      const fileExt = extMap[file.type] || 'jpg';
       const fileName = `report-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
-      const filePath = `fotos/${fileName}`;
+      const filePath = `${user.id}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('zeladoria-fotos')
@@ -78,92 +112,139 @@ export default function PostarPage() {
         });
 
       if (uploadError) {
-        console.warn('Storage indisponível, usando imagem em buffer local:', uploadError.message);
-        setFotoUrl(localUrl);
-      } else {
-        const { data: publicUrlData } = supabase.storage
-          .from('zeladoria-fotos')
-          .getPublicUrl(filePath);
-
-        setFotoUrl(publicUrlData.publicUrl);
+        setFotoUrl(null);
+        setFotoPreview(null);
+        setErrorMsg('Falha ao enviar a foto para o servidor. Verifique sua conexão e tente novamente.');
+        return;
       }
-    } catch (err) {
-      console.warn('Erro ao processar imagem, mantendo preview local:', err);
-      setFotoUrl(localUrl);
+
+      const { data: publicUrlData } = supabase.storage
+        .from('zeladoria-fotos')
+        .getPublicUrl(filePath);
+
+      setFotoUrl(publicUrlData.publicUrl);
+    } catch {
+      setFotoUrl(null);
+      setFotoPreview(null);
+      setErrorMsg('Erro inesperado ao enviar imagem.');
     } finally {
       setUploadingFoto(false);
     }
   };
 
-  // Apoiar chamado já existente em vez de criar um duplicado
   const handleApoiarExistente = async () => {
-    if (!postDuplicado) return;
+    if (!postDuplicado || !user?.id) return;
 
     toggleApoiarPost(postDuplicado.id);
 
-    try {
-      if (user?.id) {
-        await supabase.rpc('toggle_apoiar_post', {
-          p_post_id: postDuplicado.id,
-          p_user_id: user.id,
-        });
-      }
-    } catch (err) {
-      console.warn('Apoio local registrado:', err);
+    const { error } = await supabase.rpc('toggle_apoiar_post', {
+      p_post_id: postDuplicado.id,
+    });
+
+    if (error) {
+      setErrorMsg('Não foi possível registrar seu apoio. Tente novamente.');
+      return;
     }
 
+    await queryClient.invalidateQueries({ queryKey: ['posts'] });
     router.push('/feed');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMsg(null);
+
+    if (!user?.id) {
+      router.push('/login?next=/postar');
+      return;
+    }
+
     if (!descricao.trim()) return;
+    if (uploadingFoto) {
+      setErrorMsg('Aguarde o envio da foto terminar.');
+      return;
+    }
 
     setLoading(true);
 
     const ano = new Date().getFullYear();
     const randomNum = Math.floor(10000 + Math.random() * 90000);
-    const novoProtocolo = `SJC-${ano}-${randomNum}`;
-    const novoPostId = `post-${Date.now()}`;
+    const prefixo = (user.estado || 'BR').toUpperCase().slice(0, 2);
+    const novoProtocolo = `${prefixo}-${ano}-${randomNum}`;
 
-    const novoPost: PostComunidade = {
-      id: novoPostId,
-      user_id: user?.id || 'demo-user',
-      user: user || undefined,
-      foto_url: fotoUrl,
-      descricao: `${descricao.trim()} #${categoria} #${(user?.bairro || 'Aquárius').toLowerCase().replace(/\s+/g, '')}`,
-      cep: user?.cep || '12246-021',
-      bairro: user?.bairro || 'Jardim Aquárius',
-      categoria,
-      numero_protocolo: novoProtocolo,
-      curtidas: 1,
-      moradores_afetados: 1,
-      user_ja_apoiou: true,
-      created_at: new Date().toISOString(),
-    };
+    const bairroLimpo = user.bairro || 'Centro';
+    const descricaoFinal = `${descricao.trim()} #${categoria} #${bairroLimpo.toLowerCase().replace(/\s+/g, '')}`;
+    const imagemFinal =
+      fotoUrl ||
+      'https://images.unsplash.com/photo-1578885136359-16c8bd4d3a8e?auto=format&fit=crop&w=800&q=80';
 
     try {
-      if (user?.id) {
-        await supabase.rpc('criar_post_zeladoria', {
-          p_user_id: user.id,
-          p_foto_url: fotoUrl,
-          p_descricao: novoPost.descricao,
-          p_cep: novoPost.cep,
-          p_bairro: novoPost.bairro,
-          p_categoria: categoria,
-          p_protocolo: novoProtocolo,
-        });
+      const { data, error } = await supabase.rpc('criar_post_zeladoria', {
+        p_foto_url: imagemFinal,
+        p_descricao: descricaoFinal,
+        p_cep: user.cep || '00000-000',
+        p_bairro: bairroLimpo,
+        p_categoria: categoria,
+        p_protocolo: novoProtocolo,
+      });
+
+      if (error || !data?.post_id) {
+        setErrorMsg(error?.message || 'Não foi possível salvar o chamado no banco de dados.');
+        setLoading(false);
+        return;
       }
-    } catch (err) {
-      console.warn('RPC Supabase indisponível, salvo no feed local:', err);
+
+      const novoPost: PostComunidade = {
+        id: data.post_id,
+        user_id: user.id,
+        user,
+        foto_url: imagemFinal,
+        descricao: descricaoFinal,
+        cep: user.cep || '00000-000',
+        bairro: bairroLimpo,
+        categoria,
+        numero_protocolo: novoProtocolo,
+        curtidas: 0,
+        moradores_afetados: 1,
+        user_ja_apoiou: true,
+        created_at: new Date().toISOString(),
+      };
+
+      adicionarPost(novoPost);
+      await queryClient.invalidateQueries({ queryKey: ['posts'] });
+
+      setLoading(false);
+      setProtocoloGerado(novoProtocolo);
+    } catch {
+      setErrorMsg('Falha de rede ao publicar chamado.');
+      setLoading(false);
     }
-
-    // Adiciona na store do feed imediatamente
-    adicionarPost(novoPost);
-
-    setLoading(false);
-    setProtocoloGerado(novoProtocolo);
   };
+
+  if (isAuthLoading) {
+    return (
+      <div className="p-8 text-center text-xs text-gray-500">
+        Verificando sua sessão...
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="p-6 text-center space-y-4 max-w-md mx-auto">
+        <p className="text-sm font-bold text-gray-900">Faça login para cobrar zeladoria</p>
+        <p className="text-xs text-gray-500">
+          Sua conta vincula o chamado ao seu bairro e gera o protocolo oficial.
+        </p>
+        <Link
+          href="/login?next=/postar"
+          className="inline-flex items-center justify-center rounded-xl py-3 px-6 text-xs font-bold bg-crimson-600 text-white"
+        >
+          Entrar na Conta
+        </Link>
+      </div>
+    );
+  }
 
   if (protocoloGerado) {
     return (
@@ -182,14 +263,14 @@ export default function PostarPage() {
             {protocoloGerado}
           </p>
           <p className="text-[11px] text-crimson-800 leading-snug">
-            Encaminhado automaticamente para a triagem da central de zeladoria municipal de <strong>{user?.cidade || 'São José dos Campos'}</strong>.
+            Registrado para a central de zeladoria de <strong>{user.cidade}</strong>.
           </p>
         </div>
 
         <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-600 text-left space-y-1">
           <p className="font-bold text-gray-800">💡 Como funciona a prioridade?</p>
           <p className="text-[11px] text-gray-600">
-            Quanto mais moradores do bairro clicarem em <strong>&quot;Também me afeta (+1)&quot;</strong>, mais rápido o problema sobe na fila da Prefeitura!
+            Quanto mais moradores do bairro clicarem em <strong>&quot;Também me afeta (+1)&quot;</strong>, mais rápido o problema sobe na fila de cobrança!
           </p>
         </div>
 
@@ -206,7 +287,6 @@ export default function PostarPage() {
 
   return (
     <div className="p-4 space-y-4 max-w-md mx-auto min-h-screen bg-white pb-24">
-      {/* Top Header */}
       <div className="flex items-center space-x-2">
         <button onClick={() => router.back()} className="p-1 text-gray-500 hover:text-gray-900" aria-label="Voltar">
           <ArrowLeft className="w-5 h-5" />
@@ -214,11 +294,17 @@ export default function PostarPage() {
         <h2 className="text-lg font-black text-gray-900">Reportar Problema no Bairro</h2>
       </div>
 
+      {errorMsg && (
+        <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs font-medium flex items-start space-x-2">
+          <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+          <span>{errorMsg}</span>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Foto Preview / Upload */}
         <input
           type="file"
-          accept="image/*"
+          accept="image/jpeg,image/png,image/webp"
           capture="environment"
           ref={fileInputRef}
           onChange={handleFileSelect}
@@ -232,7 +318,7 @@ export default function PostarPage() {
           {fotoPreview || fotoUrl ? (
             <div className="relative w-full h-full">
               <Image
-                src={fotoPreview || fotoUrl}
+                src={fotoPreview || fotoUrl || ''}
                 alt="Foto do chamado"
                 fill
                 className="object-cover"
@@ -246,19 +332,18 @@ export default function PostarPage() {
             <div className="flex flex-col items-center justify-center p-4 text-center">
               <Camera className="w-8 h-8 text-crimson-600 mb-1" />
               <span className="text-xs font-bold text-gray-700">Tirar foto ou carregar da galeria</span>
-              <span className="text-[10px] text-gray-400">Geolocalização anexada automaticamente</span>
+              <span className="text-[10px] text-gray-400">JPG, PNG ou WebP até 5 MB</span>
             </div>
           )}
 
           {uploadingFoto && (
             <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white text-xs font-bold space-x-2">
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              <span>Otimizando foto...</span>
+              <span>Enviando foto...</span>
             </div>
           )}
         </div>
 
-        {/* Seleção de Categoria */}
         <div>
           <label className="text-xs font-bold text-gray-700 mb-2 block">
             Selecione a categoria do problema:
@@ -284,19 +369,18 @@ export default function PostarPage() {
           </div>
         </div>
 
-        {/* ALERTA ANTI-DUPLICAÇÃO INTELIGENTE */}
         {postDuplicado && (
           <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-2xl space-y-2.5 animate-fadeIn">
             <div className="flex items-start space-x-2">
               <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="text-xs font-black text-amber-950">
-                  Já existe um chamado aberto sobre isso no {user?.bairro || 'seu bairro'}!
+                  Já existe um chamado aberto sobre isso no {user.bairro}!
                 </p>
                 <p className="text-[11px] text-amber-800 mt-0.5 leading-snug">
                   Protocolo <strong>#{postDuplicado.numero_protocolo}</strong> já tem{' '}
                   <strong>{postDuplicado.moradores_afetados || 1} moradores afetados</strong>.
-                  Para a Prefeitura resolver mais rápido, o ideal é somar forças em vez de abrir chamado duplicado.
+                  Para resolver mais rápido, o ideal é somar forças em vez de abrir chamado duplicado.
                 </p>
               </div>
             </div>
@@ -321,7 +405,6 @@ export default function PostarPage() {
           </div>
         )}
 
-        {/* Descrição */}
         <div>
           <label className="text-xs font-bold text-gray-700 mb-1.5 block">
             Descrição detalhada do reparo:
@@ -336,11 +419,10 @@ export default function PostarPage() {
           />
         </div>
 
-        {/* Bairro vinculado */}
         <div className="flex items-center space-x-2 text-xs text-gray-600 bg-gray-50 p-3 rounded-xl border border-gray-200">
           <MapPin className="w-4 h-4 text-crimson-600 flex-shrink-0" />
           <span>
-            Vinculado ao bairro <strong>{user?.bairro || 'Jardim Aquárius'}</strong> - {user?.cidade || 'São José dos Campos'} ({user?.cep || '12246-021'})
+            Vinculado ao bairro <strong>{user.bairro}</strong> - {user.cidade} ({user.cep})
           </span>
         </div>
 
@@ -349,6 +431,7 @@ export default function PostarPage() {
           variant="primary"
           className="w-full rounded-xl py-3 font-bold bg-crimson-600 hover:bg-crimson-700 text-white shadow-crimson-btn"
           isLoading={loading}
+          disabled={uploadingFoto}
         >
           Publicar e Gerar Protocolo Oficial
         </Button>

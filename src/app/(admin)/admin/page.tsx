@@ -34,12 +34,29 @@ import {
   Mail,
   SendHorizontal,
   Stamp,
+  Users,
+  UserCheck,
+  Lock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import { PautaIASummarized, SYSTEM_SUMMARIZER_PROMPT } from '@/prompts/summarizer';
 import { PautaIA } from '@/types/database';
 import { EdicaoSJC } from '@/app/api/diario/sjc/route';
+import { useAuth } from '@/hooks/useAuth';
+
+interface AdminCidadao {
+  id: string;
+  nome_completo: string;
+  email: string;
+  phone: string | null;
+  cep: string;
+  bairro: string;
+  cidade: string;
+  estado: string;
+  nivel_verificacao: 0 | 1 | 2;
+  role: 'cidadao' | 'admin';
+  created_at: string;
+}
 
 export interface PeticaoModeracao {
   id: string;
@@ -96,10 +113,29 @@ const PETICOES_MODERACAO_INICIAIS: PeticaoModeracao[] = [
 ];
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<'diario_api' | 'manual_upload' | 'publicadas' | 'peticoes_mod' | 'config'>('diario_api');
+  const { user: currentUser, isAdmin, isLoading: authLoading } = useAuth();
+  const [activeTab, setActiveTab] = useState<
+    'diario_api' | 'manual_upload' | 'publicadas' | 'peticoes_mod' | 'cidadaos' | 'config'
+  >('diario_api');
 
   // Estado da Fila de Moderação de Petições Cívicas (Quórum Atingido)
   const [peticoesFila, setPeticoesFila] = useState<PeticaoModeracao[]>(PETICOES_MODERACAO_INICIAIS);
+
+  // Estado de Cidadãos, Criação de Admin & Status do Servidor
+  const [cidadaos, setCidadaos] = useState<AdminCidadao[]>([]);
+  const [currentAdminId, setCurrentAdminId] = useState<string | null>(null);
+  const [loadingCidadaos, setLoadingCidadaos] = useState(false);
+  const [atualizandoUserId, setAtualizandoUserId] = useState<string | null>(null);
+  const [showNovoAdminForm, setShowNovoAdminForm] = useState(false);
+  const [novoAdminNome, setNovoAdminNome] = useState('');
+  const [novoAdminEmail, setNovoAdminEmail] = useState('');
+  const [novoAdminSenha, setNovoAdminSenha] = useState('');
+  const [criandoAdmin, setCriandoAdmin] = useState(false);
+  const [adminCreateMsg, setAdminCreateMsg] = useState<string | null>(null);
+  const [serverConfig, setServerConfig] = useState<{
+    geminiConfigured: boolean;
+    cronSecretConfigured: boolean;
+  }>({ geminiConfigured: false, cronSecretConfigured: false });
 
   // Estado da API do Diário Oficial de SJC
   const [edicoesSJC, setEdicoesSJC] = useState<EdicaoSJC[]>([]);
@@ -120,8 +156,7 @@ export default function AdminPage() {
   const [fonteIA, setFonteIA] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Configurações da IA
-  const [apiKey, setApiKey] = useState('');
+  // Configurações da IA (prompt não-sensível; chave fica exclusivamente no servidor)
   const [customPrompt, setCustomPrompt] = useState(SYSTEM_SUMMARIZER_PROMPT);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
@@ -145,17 +180,37 @@ export default function AdminPage() {
   const [executingCron, setExecutingCron] = useState(false);
   const [cronResult, setCronResult] = useState<any>(null);
 
-  // Carrega chave salva
+  const carregarCidadaosEStatus = async () => {
+    setLoadingCidadaos(true);
+    try {
+      const res = await fetch('/api/admin/cidadaos');
+      if (res.ok) {
+        const data = await res.json();
+        setCidadaos(data.cidadaos || []);
+        if (data.currentAdminId) setCurrentAdminId(data.currentAdminId);
+        if (data.serverConfig) {
+          setServerConfig(data.serverConfig);
+        }
+      }
+    } catch (err) {
+      console.warn('Erro ao carregar cidadãos/status admin:', err);
+    } finally {
+      setLoadingCidadaos(false);
+    }
+  };
+
   useEffect(() => {
-    const savedKey = localStorage.getItem('connecta_gemini_api_key');
-    if (savedKey) setApiKey(savedKey);
+    // Limpa chave antiga caso tenha ficado salva no navegador anteriormente
+    localStorage.removeItem('connecta_gemini_api_key');
 
     const savedPrompt = localStorage.getItem('connecta_system_prompt');
     if (savedPrompt) setCustomPrompt(savedPrompt);
 
-    // Carrega edições da API de SJC na inicialização
-    carregarEdicoesDiario();
-  }, []);
+    if (isAdmin) {
+      void carregarEdicoesDiario();
+      void carregarCidadaosEStatus();
+    }
+  }, [isAdmin]);
 
   // 1. Busca as edições do Diário Oficial de SJC diretamente da API
   const carregarEdicoesDiario = async () => {
@@ -196,13 +251,76 @@ export default function AdminPage() {
     }
   }, [activeTab, cidadeFiltro]);
 
-  // Salvar configurações da IA
+  // Salvar configurações da IA (apenas prompt; chave nunca é gravada no navegador)
   const handleSaveConfig = (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem('connecta_gemini_api_key', apiKey.trim());
     localStorage.setItem('connecta_system_prompt', customPrompt.trim());
-    setStatusMessage('Configurações da IA salvas com sucesso!');
+    setStatusMessage('Prompt da IA salvo com sucesso!');
     setTimeout(() => setStatusMessage(null), 3500);
+  };
+
+  const handleAlterarCidadao = async (
+    userId: string,
+    changes: { nivel_verificacao?: 1 | 2; role?: 'cidadao' | 'admin' }
+  ) => {
+    setAtualizandoUserId(userId);
+    try {
+      const res = await fetch('/api/admin/cidadaos', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, ...changes }),
+      });
+      if (res.ok) {
+        setCidadaos((prev) =>
+          prev.map((c) => (c.id === userId ? { ...c, ...changes } : c))
+        );
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.error || 'Não foi possível atualizar o usuário.');
+      }
+    } catch {
+      alert('Erro de rede ao atualizar usuário.');
+    } finally {
+      setAtualizandoUserId(null);
+    }
+  };
+
+  const handleCriarNovoAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAdminCreateMsg(null);
+    setCriandoAdmin(true);
+
+    try {
+      const res = await fetch('/api/admin/cidadaos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nome_completo: novoAdminNome.trim(),
+          email: novoAdminEmail.trim(),
+          password: novoAdminSenha,
+          role: 'admin',
+          nivel_verificacao: 2,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAdminCreateMsg(data.error || 'Erro ao criar administrador.');
+        return;
+      }
+
+      if (data.user) {
+        setCidadaos((prev) => [data.user, ...prev]);
+      }
+      setNovoAdminNome('');
+      setNovoAdminEmail('');
+      setNovoAdminSenha('');
+      setShowNovoAdminForm(false);
+      setAdminCreateMsg(`✅ Administrador "${data.user?.nome_completo}" criado com sucesso!`);
+    } catch {
+      setAdminCreateMsg('Erro de rede ao criar administrador.');
+    } finally {
+      setCriandoAdmin(false);
+    }
   };
 
   // 3. Processar publicação oficial de SJC da API
@@ -230,7 +348,6 @@ CONTEÚDO PUBLICADO: ${edicao.texto_resumo}
           municipio: 'São José dos Campos',
           estado: 'SP',
           fonte_nome: `Diário Oficial de SJC nº ${edicao.numero} (${edicao.data})`,
-          apiKey: apiKey || undefined,
           customPrompt: customPrompt !== SYSTEM_SUMMARIZER_PROMPT ? customPrompt : undefined,
         }),
       });
@@ -293,7 +410,6 @@ CONTEÚDO PUBLICADO: ${edicao.texto_resumo}
           estado: manualEstado,
           bairro_sugerido: manualBairro,
           fonte_nome: manualFonte || `Diário Oficial de ${cidadeFinal}`,
-          apiKey: apiKey || undefined,
           customPrompt: customPrompt !== SYSTEM_SUMMARIZER_PROMPT ? customPrompt : undefined,
         }),
       });
@@ -541,6 +657,32 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
     }
   };
 
+  if (authLoading) {
+    return (
+      <div className="py-20 text-center text-xs text-gray-500">
+        Verificando credenciais de administrador...
+      </div>
+    );
+  }
+
+  if (!currentUser || !isAdmin) {
+    return (
+      <div className="max-w-md mx-auto my-12 p-6 bg-white border border-gray-200 rounded-2xl text-center space-y-3">
+        <Lock className="w-8 h-8 text-crimson-600 mx-auto" />
+        <h2 className="text-sm font-black text-gray-900">Acesso Restrito</h2>
+        <p className="text-xs text-gray-500">
+          Esta área é exclusiva para administradores autenticados do ConectaBr.
+        </p>
+        <Link
+          href="/feed"
+          className="inline-block py-2 px-4 rounded-xl bg-crimson-600 text-white text-xs font-bold"
+        >
+          Voltar ao Feed
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       {/* Top Banner */}
@@ -561,17 +703,17 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {apiKey ? (
+          {serverConfig.geminiConfigured ? (
             <span className="text-[10px] bg-crimson-100 text-crimson-800 font-bold px-2.5 py-1 rounded-full border border-crimson-200 flex items-center space-x-1">
               <Sparkles className="w-3 h-3 text-crimson-600" />
-              <span>IA Gemini Conectada</span>
+              <span>IA Gemini Ativa no Servidor</span>
             </span>
           ) : (
             <button
               onClick={() => setActiveTab('config')}
               className="text-[10px] bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold px-2.5 py-1 rounded-full border border-amber-300 flex items-center space-x-1 transition-colors"
             >
-              <span>⚠️ Modo Local (Configurar Chave Gemini)</span>
+              <span>⚠️ Modo Local (GEMINI_API_KEY no servidor)</span>
             </button>
           )}
           <span className="text-[10px] bg-gray-100 text-gray-700 font-bold px-2.5 py-1 rounded-full border border-gray-200">
@@ -580,20 +722,13 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
         </div>
       </div>
 
-      {/* Alerta de Modo de IA quando não há chave configurada */}
-      {!apiKey && (
+      {/* Alerta de Modo de IA quando GEMINI_API_KEY não está configurada no servidor */}
+      {!serverConfig.geminiConfigured && (
         <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-amber-900 animate-fadeIn">
           <div className="flex items-center space-x-2">
             <span className="text-base">💡</span>
             <span>
-              <strong>Dica de Produção:</strong> Nenhuma chave do Gemini está salva. O sistema está usando o <strong>Extrator Local Inteligente</strong>. Para a IA ler e analisar o PDF na íntegra com raciocínio contextual do <strong>Google Gemini 1.5 Flash</strong>, adicione sua chave gratuita na{' '}
-              <button
-                onClick={() => setActiveTab('config')}
-                className="font-bold underline hover:text-amber-950"
-              >
-                Aba 4 (Chave IA & Prompts)
-              </button>
-              .
+              <strong>Configuração de Servidor:</strong> A variável <code>GEMINI_API_KEY</code> ainda não está definida no servidor (.env / Vercel). O sistema está operando com o <strong>Extrator Local Inteligente</strong>.
             </span>
           </div>
         </div>
@@ -713,6 +848,21 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
         </button>
 
         <button
+          onClick={() => {
+            setActiveTab('cidadaos');
+            void carregarCidadaosEStatus();
+          }}
+          className={`py-3 px-2 sm:px-4 text-xs sm:text-sm font-black border-b-2 flex items-center space-x-2 transition-all whitespace-nowrap ${
+            activeTab === 'cidadaos'
+              ? 'border-crimson-600 text-crimson-800'
+              : 'border-transparent text-gray-500 hover:text-gray-900'
+          }`}
+        >
+          <Users className="w-4 h-4 text-crimson-600" />
+          <span>5. Cidadãos ({cidadaos.length})</span>
+        </button>
+
+        <button
           onClick={() => setActiveTab('config')}
           className={`py-3 px-2 sm:px-4 text-xs sm:text-sm font-black border-b-2 flex items-center space-x-2 transition-all whitespace-nowrap ${
             activeTab === 'config'
@@ -721,7 +871,7 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
           }`}
         >
           <Sliders className="w-4 h-4" />
-          <span>5. Chave IA & Prompts</span>
+          <span>6. IA & Servidor</span>
         </button>
       </div>
 
@@ -1279,9 +1429,9 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
           )}
 
           {/* Aviso sobre o modo de processamento */}
-          {!apiKey && (
+          {!serverConfig.geminiConfigured && (
             <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-center">
-              ⚙️ Sem chave Gemini configurada: o sistema processará o PDF através do <strong>Extrator Local Inteligente</strong> (lendo atos oficiais, contratos e secretarias direto do arquivo).
+              ⚙️ Sem <code>GEMINI_API_KEY</code> no servidor: o sistema processará o PDF através do <strong>Extrator Local Inteligente</strong>.
             </p>
           )}
 
@@ -1629,16 +1779,204 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
       )}
 
       {/* ======================================================== */}
-      {/* ABA 5: CHAVE DA IA & PROMPTS                             */}
+      {/* ABA 5: VERIFICAÇÃO DE CIDADÃOS & GESTÃO DE ADMINS        */}
+      {/* ======================================================== */}
+      {activeTab === 'cidadaos' && (
+        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-gray-100">
+            <div>
+              <h3 className="text-sm font-black text-gray-900 flex items-center space-x-2">
+                <UserCheck className="w-5 h-5 text-crimson-600" />
+                <span>Cidadãos (Nível 2) & Administradores</span>
+              </h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                <strong>Nível 2</strong> libera apenas votos como cidadão; <strong>Admin</strong> libera acesso a este painel. São permissões independentes.
+              </p>
+            </div>
+
+            <div className="flex items-center space-x-2 self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNovoAdminForm((prev) => !prev);
+                  setAdminCreateMsg(null);
+                }}
+                className="text-xs font-bold text-white bg-crimson-600 hover:bg-crimson-700 px-3 py-1.5 rounded-xl flex items-center space-x-1.5 shadow-sm"
+              >
+                <span>{showNovoAdminForm ? '✕ Fechar' : '+ Novo Admin'}</span>
+              </button>
+
+              <button
+                onClick={carregarCidadaosEStatus}
+                disabled={loadingCidadaos}
+                className="text-xs font-bold text-gray-700 hover:text-crimson-700 bg-white border border-gray-200 px-3 py-1.5 rounded-xl flex items-center space-x-1.5 shadow-sm"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loadingCidadaos ? 'animate-spin' : ''}`} />
+                <span>Atualizar</span>
+              </button>
+            </div>
+          </div>
+
+          {adminCreateMsg && (
+            <div className="p-3 rounded-xl bg-crimson-50 border border-crimson-200 text-xs font-bold text-crimson-900">
+              {adminCreateMsg}
+            </div>
+          )}
+
+          {showNovoAdminForm && (
+            <form onSubmit={handleCriarNovoAdmin} className="p-4 bg-neutral-50 border border-gray-200 rounded-2xl space-y-3 animate-fadeIn">
+              <h4 className="text-xs font-black text-gray-900">Cadastrar Novo Administrador com Nome Completo</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold text-gray-600 uppercase block mb-1">Nome Completo</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ex: João Moderador"
+                    value={novoAdminNome}
+                    onChange={(e) => setNovoAdminNome(e.target.value)}
+                    className="w-full p-2 bg-white border border-gray-200 rounded-xl text-xs text-gray-900"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-600 uppercase block mb-1">E-mail</label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="admin@conectabr.com"
+                    value={novoAdminEmail}
+                    onChange={(e) => setNovoAdminEmail(e.target.value)}
+                    className="w-full p-2 bg-white border border-gray-200 rounded-xl text-xs text-gray-900"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-600 uppercase block mb-1">Senha Provisória</label>
+                  <input
+                    type="password"
+                    required
+                    minLength={6}
+                    placeholder="Mínimo 6 caracteres"
+                    value={novoAdminSenha}
+                    onChange={(e) => setNovoAdminSenha(e.target.value)}
+                    className="w-full p-2 bg-white border border-gray-200 rounded-xl text-xs text-gray-900"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <Button
+                  type="submit"
+                  variant="primary"
+                  isLoading={criandoAdmin}
+                  className="py-2 px-4 rounded-xl text-xs font-bold bg-crimson-600 hover:bg-crimson-700 text-white"
+                >
+                  Criar Administrador Ativo
+                </Button>
+              </div>
+            </form>
+          )}
+
+          {loadingCidadaos ? (
+            <div className="py-10 text-center text-xs text-gray-400">Carregando cidadãos...</div>
+          ) : cidadaos.length === 0 ? (
+            <div className="py-10 text-center text-xs text-gray-400">Nenhum cidadão cadastrado ainda.</div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {cidadaos.map((c) => {
+                const isSelf = c.id === currentAdminId;
+                return (
+                  <div key={c.id} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center flex-wrap gap-2">
+                        <span className="text-xs font-bold text-gray-900">{c.nome_completo}</span>
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            c.nivel_verificacao >= 2
+                              ? 'bg-crimson-100 text-crimson-800'
+                              : 'bg-amber-100 text-amber-900'
+                          }`}
+                        >
+                          Nível {c.nivel_verificacao}
+                        </span>
+                        {c.role === 'admin' && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-900 text-white">
+                            Admin
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-gray-500">
+                        {c.email} • {c.bairro}, {c.cidade} - {c.estado} (CEP {c.cep})
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                      {c.nivel_verificacao < 2 ? (
+                        <Button
+                          variant="primary"
+                          isLoading={atualizandoUserId === c.id}
+                          onClick={() => handleAlterarCidadao(c.id, { nivel_verificacao: 2 })}
+                          className="py-1.5 px-3 rounded-xl text-xs font-bold bg-crimson-600 hover:bg-crimson-700 text-white"
+                        >
+                          Aprovar Nível 2
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          isLoading={atualizandoUserId === c.id}
+                          onClick={() => handleAlterarCidadao(c.id, { nivel_verificacao: 1 })}
+                          className="py-1.5 px-3 rounded-xl text-xs font-semibold"
+                        >
+                          Voltar Nível 1
+                        </Button>
+                      )}
+
+                      {c.role !== 'admin' ? (
+                        <Button
+                          variant="outline"
+                          isLoading={atualizandoUserId === c.id}
+                          onClick={() => {
+                            if (confirm(`Deseja conceder acesso de Administrador para ${c.nome_completo}?`)) {
+                              void handleAlterarCidadao(c.id, { role: 'admin' });
+                            }
+                          }}
+                          className="py-1.5 px-3 rounded-xl text-xs font-semibold"
+                        >
+                          Tornar Admin
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          disabled={isSelf}
+                          isLoading={atualizandoUserId === c.id}
+                          onClick={() => {
+                            if (confirm(`Remover acesso de Administrador de ${c.nome_completo}?`)) {
+                              void handleAlterarCidadao(c.id, { role: 'cidadao' });
+                            }
+                          }}
+                          className="py-1.5 px-3 rounded-xl text-xs font-semibold disabled:opacity-40"
+                        >
+                          {isSelf ? 'Você (Admin)' : 'Remover Admin'}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* ABA 6: CONFIGURAÇÕES DE IA NO SERVIDOR & PROMPTS         */}
       {/* ======================================================== */}
       {activeTab === 'config' && (
         <form onSubmit={handleSaveConfig} className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-5">
           <div>
             <h3 className="text-sm font-black text-gray-900">
-              Configurações da Inteligência Artificial
+              Configurações da Inteligência Artificial & Segurança
             </h3>
             <p className="text-xs text-gray-500">
-              Insira sua chave gratuita do Google Gemini e edite os comandos que ensinam a IA a resumir as leis.
+              Por segurança, chaves secretas não ficam mais salvas no navegador. Elas devem ser configuradas apenas nas variáveis de ambiente do servidor (.env.local / Vercel).
             </p>
           </div>
 
@@ -1648,33 +1986,39 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
             </div>
           )}
 
-          {/* Chave de API */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-gray-700 flex items-center justify-between">
-              <span className="flex items-center space-x-1.5">
+          {/* Status das Variáveis no Servidor */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div className="p-3 rounded-xl border border-gray-200 bg-gray-50 flex items-center justify-between">
+              <div className="flex items-center space-x-2">
                 <Key className="w-4 h-4 text-crimson-600" />
-                <span>Google Gemini API Key:</span>
-              </span>
-              <a
-                href="https://aistudio.google.com/app/apikey"
-                target="_blank"
-                rel="noreferrer"
-                className="text-crimson-600 hover:underline text-[11px] flex items-center space-x-1"
+                <span className="font-bold text-gray-800">GEMINI_API_KEY (Servidor)</span>
+              </div>
+              <span
+                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                  serverConfig.geminiConfigured
+                    ? 'bg-crimson-100 text-crimson-800'
+                    : 'bg-amber-100 text-amber-900'
+                }`}
               >
-                <span>Obter chave gratuita no Google AI Studio</span>
-                <ExternalLink className="w-3 h-3" />
-              </a>
-            </label>
-            <Input
-              type="password"
-              placeholder="Cole sua chave AIzaSy..."
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              className="font-mono text-xs"
-            />
-            <p className="text-[11px] text-gray-400">
-              Plano 100% gratuito (1.500 requisições/dia). Fica salva localmente no seu navegador.
-            </p>
+                {serverConfig.geminiConfigured ? 'Configurada' : 'Ausente (Modo Local)'}
+              </span>
+            </div>
+
+            <div className="p-3 rounded-xl border border-gray-200 bg-gray-50 flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <ShieldCheck className="w-4 h-4 text-crimson-600" />
+                <span className="font-bold text-gray-800">CRON_SECRET (Servidor)</span>
+              </div>
+              <span
+                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                  serverConfig.cronSecretConfigured
+                    ? 'bg-crimson-100 text-crimson-800'
+                    : 'bg-amber-100 text-amber-900'
+                }`}
+              >
+                {serverConfig.cronSecretConfigured ? 'Configurada' : 'Ausente (Cron bloqueado)'}
+              </span>
+            </div>
           </div>
 
           {/* Prompt de Sistema */}
@@ -1700,7 +2044,7 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
           </div>
 
           <Button type="submit" variant="primary" className="py-3 px-6 font-bold bg-crimson-600 hover:bg-crimson-700 text-white rounded-xl">
-            Salvar Configurações
+            Salvar Prompt
           </Button>
         </form>
       )}

@@ -3,10 +3,20 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useAuth } from '@/hooks/useAuth';
+
+function getSafeNextPath(): string {
+  if (typeof window === 'undefined') return '/feed';
+  const params = new URLSearchParams(window.location.search);
+  const next = params.get('next');
+  if (next && next.startsWith('/') && !next.startsWith('//')) {
+    return next;
+  }
+  return '/feed';
+}
 
 export const LoginForm: React.FC = () => {
   const router = useRouter();
@@ -16,13 +26,23 @@ export const LoginForm: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMsg(null);
     setLoading(true);
-    await login(email, password);
+
+    const result = await login(email, password);
     setLoading(false);
-    router.push('/feed');
+
+    if (!result.ok) {
+      setErrorMsg(result.error || 'Não foi possível entrar. Verifique seus dados.');
+      return;
+    }
+
+    router.push(getSafeNextPath());
+    router.refresh();
   };
 
   return (
@@ -42,11 +62,18 @@ export const LoginForm: React.FC = () => {
         </p>
       </div>
 
+      {errorMsg && (
+        <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs font-medium flex items-start space-x-2">
+          <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+          <span>{errorMsg}</span>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-4">
         <Input
-          label="E-mail ou Telefone"
-          type="text"
-          placeholder="exemplo@email.com ou (11) 98765-4321"
+          label="E-mail"
+          type="email"
+          placeholder="exemplo@email.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           leftIcon={<Mail className="w-4 h-4 text-gray-400" />}
@@ -123,4 +150,3 @@ export const LoginForm: React.FC = () => {
     </div>
   );
 };
-

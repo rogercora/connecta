@@ -1,107 +1,159 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase/server';
+import { requireAuthUser } from '@/lib/auth/serverAuth';
+import { getSupabaseAdmin } from '@/lib/supabase/server';
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export async function POST(req: Request) {
   try {
-    const { pauta_id, user_id, opcao_voto, motivo_discordancia } = await req.json();
+    const auth = await requireAuthUser();
+    if (!auth.ok) return auth.response;
 
-    if (!pauta_id || !opcao_voto) {
+    if (!auth.profile) {
       return NextResponse.json(
-        { error: 'Campos obrigatórios ausentes: pauta_id e opcao_voto são necessários.' },
+        { error: 'Perfil de cidadão não encontrado. Conclua seu cadastro antes de votar.' },
+        { status: 403 }
+      );
+    }
+
+    if ((auth.profile.nivel_verificacao ?? 0) < 2) {
+      return NextResponse.json(
+        { error: 'Apenas cidadãos verificados (Nível 2) podem votar nas decisões da Câmara.' },
+        { status: 403 }
+      );
+    }
+
+    const body = await req.json();
+    const { pauta_id, opcao_voto, motivo_discordancia } = body ?? {};
+
+    if (!pauta_id || typeof pauta_id !== 'string' || !UUID_REGEX.test(pauta_id)) {
+      return NextResponse.json(
+        { error: 'Identificador de pauta inválido.' },
         { status: 400 }
       );
     }
 
-    const effectiveUserId = user_id || 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
-
-    let dbSuccess = false;
-    let votosConcordarAtual = 0;
-    let votosDiscordarAtual = 0;
-
-    // 1. Tenta gravar ou atualizar em votos_pauta no Supabase
-    try {
-      const { error: insertError } = await supabaseAdmin
-        .from('votos_pauta')
-        .upsert(
-          {
-            pauta_id,
-            user_id: effectiveUserId,
-            opcao_voto,
-            motivo_discordancia: motivo_discordancia || null,
-          },
-          { onConflict: 'pauta_id,user_id' }
-        );
-
-      if (!insertError) {
-        dbSuccess = true;
-      } else {
-        console.warn('Aviso: Supabase votos_pauta:', insertError.message);
-      }
-
-      // 2. Busca e atualiza a contagem na tabela pautas_ia
-      const { data: pautaData } = await supabaseAdmin
-        .from('pautas_ia')
-        .select('votos_concordar, votos_discordar')
-        .eq('id', pauta_id)
-        .maybeSingle();
-
-      if (pautaData) {
-        votosConcordarAtual = pautaData.votos_concordar || 0;
-        votosDiscordarAtual = pautaData.votos_discordar || 0;
-
-        const novoConcordar =
-          opcao_voto === 'concordar' ? votosConcordarAtual + 1 : votosConcordarAtual;
-        const novoDiscordar =
-          opcao_voto === 'discordar' ? votosDiscordarAtual + 1 : votosDiscordarAtual;
-
-        await supabaseAdmin
-          .from('pautas_ia')
-          .update({
-            votos_concordar: novoConcordar,
-            votos_discordar: novoDiscordar,
-          })
-          .eq('id', pauta_id);
-
-        votosConcordarAtual = novoConcordar;
-        votosDiscordarAtual = novoDiscordar;
-      }
-    } catch (dbErr) {
-      console.warn('Exceção ao persistir no Supabase:', dbErr);
+    if (opcao_voto !== 'concordar' && opcao_voto !== 'discordar') {
+      return NextResponse.json(
+        { error: 'Opção de voto inválida. Escolha concordar ou discordar.' },
+        { status: 400 }
+      );
     }
+
+    const motivoLimpo =
+      typeof motivo_discordancia === 'string' ? motivo_discordancia.trim() : '';
+
+    if (opcao_voto === 'discordar' && !motivoLimpo) {
+      return NextResponse.json(
+        { error: 'Informe o motivo da discordância para registrar sua assinatura de oposição.' },
+        { status: 400 }
+      );
+    }
+
+    if (motivoLimpo.length > 1000) {
+      return NextResponse.json(
+        { error: 'O motivo deve ter no máximo 1.000 caracteres.' },
+        { status: 400 }
+      );
+    }
+
+    const supabaseAdmin = getSupabaseAdmin();
+
+    // Verifica se a pauta existe e está ativa
+    const { data: pautaExistente, error: pautaError } = await supabaseAdmin
+      .from('pautas_ia')
+      .select('id, status, votos_concordar, votos_discordar')
+      .eq('id', pauta_id)
+      .maybeSingle();
+
+    if (pautaError || !pautaExistente) {
+      return NextResponse.json(
+        { error: 'Pauta não encontrada.' },
+        { status: 404 }
+      );
+    }
+
+    // Insere voto único (sem upsert). O trigger trg_votos_pauta_after_insert incrementa pautas_ia.
+    const { error: insertError } = await supabaseAdmin
+      .from('votos_pauta')
+      .insert({
+        pauta_id,
+        user_id: auth.authUser.id,
+        opcao_voto,
+        motivo_discordancia: opcao_voto === 'discordar' ? motivoLimpo : null,
+      });
+
+    if (insertError) {
+      if (insertError.code === '23505') {
+        return NextResponse.json(
+          {
+            error: 'Você já registrou seu voto nesta pauta.',
+            already_voted: true,
+            contadores: {
+              votos_concordar: pautaExistente.votos_concordar || 0,
+              votos_discordar: pautaExistente.votos_discordar || 0,
+            },
+          },
+          { status: 409 }
+        );
+      }
+
+      console.error('Erro ao inserir voto:', insertError.message);
+      return NextResponse.json(
+        { error: 'Não foi possível registrar seu voto no momento.' },
+        { status: 500 }
+      );
+    }
+
+    // Lê os contadores atualizados atomicamente pelo trigger do PostgreSQL
+    const { data: pautaAtualizada } = await supabaseAdmin
+      .from('pautas_ia')
+      .select('votos_concordar, votos_discordar')
+      .eq('id', pauta_id)
+      .maybeSingle();
 
     return NextResponse.json({
       success: true,
-      message: 'Voto computado com sucesso no quórum auditado.',
+      message: 'Voto computado com sucesso.',
       voto: {
         pauta_id,
-        user_id: effectiveUserId,
+        user_id: auth.authUser.id,
         opcao_voto,
-        motivo_discordancia: motivo_discordancia || null,
+        motivo_discordancia: opcao_voto === 'discordar' ? motivoLimpo : null,
         created_at: new Date().toISOString(),
       },
       contadores: {
-        votos_concordar: votosConcordarAtual,
-        votos_discordar: votosDiscordarAtual,
+        votos_concordar: pautaAtualizada?.votos_concordar ?? pautaExistente.votos_concordar ?? 0,
+        votos_discordar: pautaAtualizada?.votos_discordar ?? pautaExistente.votos_discordar ?? 0,
       },
-      db_persisted: dbSuccess,
+      db_persisted: true,
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Erro em POST /api/votos:', error?.message);
+    return NextResponse.json({ error: 'Erro interno ao processar voto.' }, { status: 500 });
   }
 }
 
 export async function GET(req: Request) {
   try {
+    const auth = await requireAuthUser();
+    if (!auth.ok) return auth.response;
+
     const { searchParams } = new URL(req.url);
     const pauta_id = searchParams.get('pauta_id');
-    const user_id = searchParams.get('user_id') || 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
+
+    const supabaseAdmin = getSupabaseAdmin();
 
     if (pauta_id) {
+      if (!UUID_REGEX.test(pauta_id)) {
+        return NextResponse.json({ has_voted: false, voto: null });
+      }
+
       const { data } = await supabaseAdmin
         .from('votos_pauta')
-        .select('*')
+        .select('pauta_id, opcao_voto, motivo_discordancia, created_at')
         .eq('pauta_id', pauta_id)
-        .eq('user_id', user_id)
+        .eq('user_id', auth.authUser.id)
         .maybeSingle();
 
       return NextResponse.json({
@@ -110,17 +162,16 @@ export async function GET(req: Request) {
       });
     }
 
-    // Se passou apenas user_id, retorna todos os votos desse usuário
     const { data: userVotos } = await supabaseAdmin
       .from('votos_pauta')
       .select('pauta_id, opcao_voto, motivo_discordancia, created_at')
-      .eq('user_id', user_id);
+      .eq('user_id', auth.authUser.id);
 
     return NextResponse.json({
       votos: userVotos || [],
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Erro em GET /api/votos:', error?.message);
+    return NextResponse.json({ error: 'Erro ao consultar votos.' }, { status: 500 });
   }
 }
-

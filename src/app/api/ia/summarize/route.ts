@@ -1,15 +1,49 @@
 import { NextResponse } from 'next/server';
 import zlib from 'zlib';
-import { buildSummarizerPrompt, DiarioOficialInput, PautaIASummarized, SYSTEM_SUMMARIZER_PROMPT } from '@/prompts/summarizer';
+import { requireAdminUser } from '@/lib/auth/serverAuth';
+import { buildSummarizerPrompt, DiarioOficialInput, PautaIASummarized } from '@/prompts/summarizer';
+
+const MAX_PDF_BYTES = 10 * 1024 * 1024; // 10 MB
+
+const ALLOWED_PDF_HOST_SUFFIXES = [
+  '.sp.gov.br',
+  '.gov.br',
+  '.leg.br',
+  'queridodiario.ok.org.br',
+];
+
+function isAllowedOfficialUrl(rawUrl: string): URL | null {
+  try {
+    const parsed = new URL(rawUrl.trim());
+    if (parsed.protocol !== 'https:') return null;
+    if (parsed.username || parsed.password) return null;
+
+    const host = parsed.hostname.toLowerCase();
+    // Bloqueia endereços numéricos/IPs e hosts locais explicitamente
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(':') || host === 'localhost') {
+      return null;
+    }
+
+    const isAllowed = ALLOWED_PDF_HOST_SUFFIXES.some((suffix) =>
+      suffix.startsWith('.') ? host.endsWith(suffix) : host === suffix || host.endsWith(`.${suffix}`)
+    );
+
+    return isAllowed ? parsed : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Extrator nativo de texto de streams FlateDecode de arquivos PDF em Base64.
- * Funciona de forma 100% segura no Node.js/Vercel sem dependências binárias externas.
+ * Funciona no Node.js/Vercel sem dependências binárias externas.
  */
 function extractTextFromPdfBase64(base64Data: string): string {
   try {
     const cleanBase64 = base64Data.replace(/^data:application\/pdf;base64,/, '');
     const buffer = Buffer.from(cleanBase64, 'base64');
+    if (buffer.byteLength > MAX_PDF_BYTES) return '';
+
     let combined = '';
     let idx = 0;
 
@@ -46,13 +80,12 @@ function extractTextFromPdfBase64(base64Data: string): string {
             }
           });
         }
-      } catch (e) {
+      } catch {
         // Ignora streams que não usam compressão flate padrão
       }
       idx = streamEnd + 9;
     }
 
-    // Decodifica escapes octais comuns em PDFs (\272 -> º, \347 -> ç, etc.)
     const decoded = combined.replace(/\\([0-7]{1,3})/g, (_, oct) =>
       String.fromCharCode(parseInt(oct, 8))
     );
@@ -65,6 +98,9 @@ function extractTextFromPdfBase64(base64Data: string): string {
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireAdminUser();
+    if (!auth.ok) return auth.response;
+
     const body = await req.json();
     const {
       texto_bruto,
@@ -75,52 +111,90 @@ export async function POST(req: Request) {
       estado = 'SP',
       bairro_sugerido,
       fonte_nome = 'Diário Oficial Municipal',
-      apiKey: userApiKey,
       customPrompt,
-    } = body;
+    } = body ?? {};
 
-    let finalPdfBase64 = pdf_base64;
+    let finalPdfBase64: string | undefined =
+      typeof pdf_base64 === 'string' && pdf_base64.length > 0 ? pdf_base64 : undefined;
 
-    // Se veio uma URL de PDF (como as edições da API oficial de SJC), baixa o buffer do PDF
-    if (!finalPdfBase64 && pdf_url) {
+    if (finalPdfBase64) {
+      const approxBytes = Math.ceil((finalPdfBase64.length * 3) / 4);
+      if (approxBytes > MAX_PDF_BYTES) {
+        return NextResponse.json(
+          { error: 'Arquivo PDF excede o limite máximo permitido (10 MB).' },
+          { status: 413 }
+        );
+      }
+    }
+
+    // Download remoto de PDF protegido contra SSRF (somente HTTPS em domínios oficiais permitidos)
+    if (!finalPdfBase64 && typeof pdf_url === 'string' && pdf_url.trim()) {
+      const validatedUrl = isAllowedOfficialUrl(pdf_url);
+      if (!validatedUrl) {
+        return NextResponse.json(
+          { error: 'URL do PDF rejeitada: informe apenas links HTTPS de portais oficiais (.gov.br, .leg.br ou Querido Diário).' },
+          { status: 400 }
+        );
+      }
+
       try {
-        const downloadRes = await fetch(pdf_url, {
+        const downloadRes = await fetch(validatedUrl.toString(), {
           headers: {
             'User-Agent':
               'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           },
+          signal: AbortSignal.timeout(15000),
+          redirect: 'follow',
         });
+
+        // Verifica o destino final pós-redirect para evitar bypass via open redirect
+        if (downloadRes.url && !isAllowedOfficialUrl(downloadRes.url)) {
+          return NextResponse.json(
+            { error: 'Redirecionamento para domínio não autorizado bloqueado.' },
+            { status: 400 }
+          );
+        }
+
         if (downloadRes.ok) {
+          const contentLength = Number(downloadRes.headers.get('content-length') || '0');
+          if (contentLength > MAX_PDF_BYTES) {
+            return NextResponse.json(
+              { error: 'O PDF remoto excede o tamanho máximo de 10 MB.' },
+              { status: 413 }
+            );
+          }
+
           const ab = await downloadRes.arrayBuffer();
-          finalPdfBase64 = Buffer.from(ab).toString('base64');
+          if (ab.byteLength <= MAX_PDF_BYTES) {
+            finalPdfBase64 = Buffer.from(ab).toString('base64');
+          }
         }
       } catch (err) {
         console.warn('Não foi possível baixar PDF da URL remota:', err);
       }
     }
 
-    // Se não veio texto nem PDF
-    if (!texto_bruto?.trim() && !finalPdfBase64) {
+    const textoBrutoStr = typeof texto_bruto === 'string' ? texto_bruto.trim() : '';
+
+    if (!textoBrutoStr && !finalPdfBase64) {
       return NextResponse.json(
-        { error: 'Por favor, envie o texto da publicação, anexe um arquivo PDF ou informe o link da edição.' },
+        { error: 'Por favor, envie o texto da publicação, anexe um arquivo PDF ou informe o link oficial.' },
         { status: 400 }
       );
     }
 
-    let municipioEfetivo = municipio;
-    let fonteEfetiva = fonte_nome;
-    let textoEfetivo = texto_bruto?.trim() || '';
+    let municipioEfetivo = String(municipio || 'São José dos Campos');
+    let fonteEfetiva = String(fonte_nome || 'Diário Oficial Municipal');
+    let textoEfetivo = textoBrutoStr.slice(0, 40000);
     let textoExtraidoPdf = '';
 
-    // Extração de texto do PDF caso tenha sido enviado arquivo
     if (finalPdfBase64) {
       textoExtraidoPdf = extractTextFromPdfBase64(finalPdfBase64);
 
       if (textoExtraidoPdf) {
         const lowerPdf = textoExtraidoPdf.toLowerCase();
-        const nomeLower = (pdf_nome || '').toLowerCase();
+        const nomeLower = String(pdf_nome || '').toLowerCase();
 
-        // Auto-detecção precisa da cidade de origem pelo conteúdo ou nome do arquivo
         if (
           lowerPdf.includes('são josé dos campos') ||
           lowerPdf.includes('sao jose dos campos') ||
@@ -141,38 +215,36 @@ export async function POST(req: Request) {
         }
 
         if (!textoEfetivo) {
-          // Usa os trechos mais relevantes do PDF para análise
           textoEfetivo = textoExtraidoPdf.slice(0, 25000);
         }
       }
     }
 
     if (!textoEfetivo) {
-      textoEfetivo = `[Documento PDF Anexado: ${pdf_nome || 'diario_oficial.pdf'}]`;
+      textoEfetivo = `[Documento PDF Anexado: ${String(pdf_nome || 'diario_oficial.pdf')}]`;
     }
 
     const input: DiarioOficialInput = {
       texto_bruto: textoEfetivo,
       municipio: municipioEfetivo,
-      estado,
+      estado: String(estado || 'SP'),
       data_publicacao: new Date().toLocaleDateString('pt-BR'),
       fonte_nome: fonteEfetiva,
     };
 
-    const effectivePrompt = customPrompt
-      ? `${customPrompt}\n\nMUNICÍPIO ALVO: ${municipioEfetivo} - ${estado}\nBAIRRO OU REGIÃO PRINCIPAL: ${bairro_sugerido || 'Geral'}\n\nTEXTO/DOCUMENTO:\n${textoEfetivo}`
-      : buildSummarizerPrompt(input);
+    const effectivePrompt =
+      typeof customPrompt === 'string' && customPrompt.trim()
+        ? `${customPrompt.trim().slice(0, 4000)}\n\nMUNICÍPIO ALVO: ${municipioEfetivo} - ${estado}\nBAIRRO OU REGIÃO PRINCIPAL: ${bairro_sugerido || 'Geral'}\n\nTEXTO/DOCUMENTO:\n${textoEfetivo}`
+        : buildSummarizerPrompt(input);
 
-    const apiKey = userApiKey || process.env.GEMINI_API_KEY;
+    // Chave Gemini lida exclusivamente do ambiente do servidor (nunca do cliente/localStorage)
+    const apiKey = process.env.GEMINI_API_KEY;
 
-    // Se temos uma chave de API do Gemini, faz a chamada real (inclusive multimodal com PDF)
     if (apiKey) {
       try {
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-
+        const geminiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
         const parts: any[] = [{ text: effectivePrompt }];
 
-        // Se temos o arquivo PDF em base64, adiciona como parte multimodal nativa do Gemini
         if (finalPdfBase64) {
           const cleanBase64 = finalPdfBase64.replace(/^data:application\/pdf;base64,/, '');
           parts.push({
@@ -185,19 +257,18 @@ export async function POST(req: Request) {
 
         const geminiRes = await fetch(geminiUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey,
+          },
           body: JSON.stringify({
-            contents: [
-              {
-                role: 'user',
-                parts,
-              },
-            ],
+            contents: [{ role: 'user', parts }],
             generationConfig: {
               temperature: 0.2,
               responseMimeType: 'application/json',
             },
           }),
+          signal: AbortSignal.timeout(30000),
         });
 
         if (geminiRes.ok) {
@@ -222,7 +293,7 @@ export async function POST(req: Request) {
                 vereador_proponente: item.vereador_proponente || item.autor || `Prefeitura de ${municipioEfetivo}`,
                 bairro_alvo: item.bairro_alvo || bairro_sugerido || 'Centro',
                 cidade_alvo: item.cidade_alvo || municipioEfetivo,
-                estado_alvo: item.estado_alvo || estado,
+                estado_alvo: item.estado_alvo || String(estado || 'SP'),
                 relevancia_score: item.relevancia_score || 85,
                 tags: Array.isArray(item.tags) ? item.tags : ['legislação'],
                 categoria: item.categoria || 'geral',
@@ -239,7 +310,6 @@ export async function POST(req: Request) {
                 total_pautas: pautasGemini.length,
                 pautas: pautasGemini,
                 pauta: pautasGemini[0],
-                prompt_used: effectivePrompt,
               });
             }
           }
@@ -252,14 +322,13 @@ export async function POST(req: Request) {
       }
     }
 
-    // Motor Heurístico Resiliente Multi-Pautas (para quando não há chave configurada ou modo offline)
     const extrairMultiplasPautas = (texto: string): PautaIASummarized[] => {
       const lower = texto.toLowerCase();
       const pautas: PautaIASummarized[] = [];
 
-      // 1. Contratos Públicos e Gastos
-      const contratoMatch = texto.match(/CONTRATO\s+N[º°\\]*\s*(\d+\/\d+)[^]*?VALOR:\s*(R\$\s*[\d.,]+)/i) ||
-                            texto.match(/CONTRATO\s+N[º°\\]*\s*(\d+\/\d+)/i);
+      const contratoMatch =
+        texto.match(/CONTRATO\s+N[º°\\]*\s*(\d+\/\d+)[^]*?VALOR:\s*(R\$\s*[\d.,]+)/i) ||
+        texto.match(/CONTRATO\s+N[º°\\]*\s*(\d+\/\d+)/i);
       const pregaoMatch = texto.match(/PREG[ÃA]O\s+ELETR[ÔO]NICO\s+N[º°\\]*\s*(\d+\/\d+)/i);
       if (contratoMatch && contratoMatch[1]) {
         const numContrato = contratoMatch[1];
@@ -272,16 +341,16 @@ export async function POST(req: Request) {
           vereador_proponente: `Secretaria de Gestão Administrativa e Finanças - ${municipioEfetivo}`,
           bairro_alvo: 'Centro',
           cidade_alvo: municipioEfetivo,
-          estado_alvo: estado,
+          estado_alvo: String(estado || 'SP'),
           relevancia_score: 92,
           tags: ['gastos-publicos', 'licitações', 'transparência'],
           categoria: 'gastos',
         });
       }
 
-      // 2. Portarias do Executivo / Governança
-      const portariaMatch = texto.match(/Portaria\s+n[º°\\]*\s*([^\s,]+)[^]*?resolve:\s*([^\n\r.]+)/i) ||
-                            texto.match(/Portaria\s+n[º°\\]*\s*([^\s,]+)/i);
+      const portariaMatch =
+        texto.match(/Portaria\s+n[º°\\]*\s*([^\s,]+)[^]*?resolve:\s*([^\n\r.]+)/i) ||
+        texto.match(/Portaria\s+n[º°\\]*\s*([^\s,]+)/i);
       if (portariaMatch && portariaMatch[1]) {
         pautas.push({
           id_temp: `pauta_${Date.now()}_2`,
@@ -291,14 +360,13 @@ export async function POST(req: Request) {
           vereador_proponente: `Secretaria de Governança - ${municipioEfetivo}`,
           bairro_alvo: 'Geral / Toda a Cidade',
           cidade_alvo: municipioEfetivo,
-          estado_alvo: estado,
+          estado_alvo: String(estado || 'SP'),
           relevancia_score: 75,
           tags: ['governança', 'atos-oficiais', 'gestão'],
           categoria: 'governanca',
         });
       }
 
-      // 3. Meio Ambiente / Saneamento / Recursos Hídricos
       if (lower.includes('ambiental') || lower.includes('manancial') || lower.includes('resíduos') || lower.includes('saneamento')) {
         pautas.push({
           id_temp: `pauta_${Date.now()}_3`,
@@ -308,14 +376,13 @@ export async function POST(req: Request) {
           vereador_proponente: `Consórcio Público Agência Ambiental do Vale do Paraíba`,
           bairro_alvo: 'Santana',
           cidade_alvo: municipioEfetivo,
-          estado_alvo: estado,
+          estado_alvo: String(estado || 'SP'),
           relevancia_score: 80,
           tags: ['meio-ambiente', 'sustentabilidade', 'saneamento'],
           categoria: 'obras',
         });
       }
 
-      // 4. Obras Viárias, Drenagem ou Pavimentação
       if (lower.includes('obra') || lower.includes('asfalto') || lower.includes('drenagem') || lower.includes('recape')) {
         pautas.push({
           id_temp: `pauta_${Date.now()}_4`,
@@ -325,14 +392,13 @@ export async function POST(req: Request) {
           vereador_proponente: `Secretaria de Obras e Serviços Municipais - ${municipioEfetivo}`,
           bairro_alvo: bairro_sugerido || 'Bosque dos Eucaliptos',
           cidade_alvo: municipioEfetivo,
-          estado_alvo: estado,
+          estado_alvo: String(estado || 'SP'),
           relevancia_score: 88,
           tags: ['obras', 'infraestrutura', 'asfalto'],
           categoria: 'obras',
         });
       }
 
-      // 5. Transporte ou Mobilidade
       if (lower.includes('transporte') || lower.includes('ônibus') || lower.includes('tarifa') || lower.includes('itinerário')) {
         pautas.push({
           id_temp: `pauta_${Date.now()}_5`,
@@ -342,14 +408,13 @@ export async function POST(req: Request) {
           vereador_proponente: `Secretaria de Mobilidade Urbana - ${municipioEfetivo}`,
           bairro_alvo: 'Urbanova',
           cidade_alvo: municipioEfetivo,
-          estado_alvo: estado,
+          estado_alvo: String(estado || 'SP'),
           relevancia_score: 84,
           tags: ['transporte', 'mobilidade'],
           categoria: 'transporte',
         });
       }
 
-      // Se nenhum dos blocos acima bateu, gera 1 pauta geral padrão
       if (pautas.length === 0) {
         const linhas = texto.split('\n').filter((l) => l.trim().length > 15);
         const primeiraLinha = linhas[0] || texto.slice(0, 150);
@@ -361,7 +426,7 @@ export async function POST(req: Request) {
           vereador_proponente: `Prefeitura Municipal de ${municipioEfetivo}`,
           bairro_alvo: bairro_sugerido || 'Centro',
           cidade_alvo: municipioEfetivo,
-          estado_alvo: estado,
+          estado_alvo: String(estado || 'SP'),
           relevancia_score: 80,
           tags: ['legislação', 'serviços'],
           categoria: 'geral',
@@ -380,12 +445,12 @@ export async function POST(req: Request) {
       total_pautas: pautasHeuristicas.length,
       pautas: pautasHeuristicas,
       pauta: pautasHeuristicas[0],
-      prompt_used: effectivePrompt,
       note: apiKey
-        ? 'Chave configurada, mas respondeu com motor de contingência.'
-        : 'Processado com o Extrator Local Inteligente. Para habilitar o modelo Google Gemini 1.5 Flash completo, informe sua chave GEMINI_API_KEY na Aba 4.',
+        ? 'Chave configurada no servidor, mas a chamada ao Gemini falhou e respondeu com motor de contingência.'
+        : 'Processado com o Extrator Local Inteligente. Para habilitar o Google Gemini 1.5 Flash, configure GEMINI_API_KEY nas variáveis de ambiente do servidor.',
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Erro em POST /api/ia/summarize:', error?.message);
+    return NextResponse.json({ error: 'Erro interno ao processar publicação.' }, { status: 500 });
   }
 }

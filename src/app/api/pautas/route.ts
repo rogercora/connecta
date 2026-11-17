@@ -1,21 +1,35 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase/server';
-import { supabase } from '@/lib/supabase/client';
-import { INITIAL_PAUTA } from '@/stores/feedStore';
+import { requireAdminUser } from '@/lib/auth/serverAuth';
+import { createSupabaseServerClient, getSupabaseAdmin } from '@/lib/supabase/server';
 
-// GET: Lista pautas cadastradas
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const ALLOWED_STATUS = new Set(['ativa', 'encerrada', 'peticao_gerada']);
+
+function sanitizeExternalHttpsUrl(raw: unknown): string | null {
+  if (typeof raw !== 'string' || !raw.trim()) return null;
+  try {
+    const parsed = new URL(raw.trim());
+    if (parsed.protocol !== 'https:') return null;
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+// GET: Lista pautas cadastradas (leitura pública via cliente server com RLS)
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const cidade = searchParams.get('cidade');
-    const status = searchParams.get('status'); // 'ativa', 'todos', etc.
+    const status = searchParams.get('status');
+
+    const supabase = await createSupabaseServerClient();
 
     let query = supabase
       .from('pautas_ia')
       .select('*')
       .order('created_at', { ascending: false });
 
-    // Filtra por cidade a menos que seja explicitamente 'todas'
     if (cidade && cidade !== 'todas') {
       query = query.ilike('cidade_alvo', `%${cidade}%`);
     }
@@ -27,25 +41,29 @@ export async function GET(req: Request) {
     const { data, error } = await query;
 
     if (error) {
-      console.warn('Erro ao consultar pautas no Supabase, usando fallback:', error.message);
-      return NextResponse.json({
-        pautas: [INITIAL_PAUTA],
-        source: 'fallback-local',
-      });
+      console.error('Erro ao consultar pautas no Supabase:', error.message);
+      return NextResponse.json(
+        { error: 'Não foi possível carregar as pautas.' },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({
-      pautas: data && data.length > 0 ? data : [INITIAL_PAUTA],
+      pautas: data ?? [],
       source: 'supabase',
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Exceção em GET /api/pautas:', error?.message);
+    return NextResponse.json({ error: 'Erro interno ao buscar pautas.' }, { status: 500 });
   }
 }
 
-// POST: Publica uma nova pauta aprovada pelo Administrador/Moderador
+// POST: Publica uma nova pauta (restrito a Administradores)
 export async function POST(req: Request) {
   try {
+    const auth = await requireAdminUser();
+    if (!auth.ok) return auth.response;
+
     const body = await req.json();
     const {
       titulo,
@@ -60,84 +78,53 @@ export async function POST(req: Request) {
       fonte_diario = 'Diário Oficial de São José dos Campos',
       status = 'ativa',
       data_votacao = new Date(Date.now() + 86400000 * 2).toISOString(),
-    } = body;
+    } = body ?? {};
 
-    if (!titulo || !resumo_ia || !impacto_bairro || !vereador_proponente) {
+    if (
+      typeof titulo !== 'string' || !titulo.trim() ||
+      typeof resumo_ia !== 'string' || !resumo_ia.trim() ||
+      typeof impacto_bairro !== 'string' || !impacto_bairro.trim() ||
+      typeof vereador_proponente !== 'string' || !vereador_proponente.trim()
+    ) {
       return NextResponse.json(
         { error: 'Campos obrigatórios ausentes (título, resumo, impacto, vereador proponente).' },
         { status: 400 }
       );
     }
 
+    const estadoLimpo = String(estado_alvo || 'SP').trim().toUpperCase().slice(0, 2);
+    if (estadoLimpo.length !== 2) {
+      return NextResponse.json({ error: 'UF inválida.' }, { status: 400 });
+    }
+
+    const statusFinal = ALLOWED_STATUS.has(status) ? status : 'ativa';
+
     const novaPauta = {
-      titulo,
-      resumo_ia,
-      impacto_bairro,
-      vereador_proponente,
-      bairro_alvo,
-      cidade_alvo,
-      estado_alvo,
-      cep_alvo,
-      link_pdf_original,
-      fonte_diario,
-      status,
+      titulo: titulo.trim().slice(0, 300),
+      resumo_ia: resumo_ia.trim().slice(0, 2000),
+      impacto_bairro: impacto_bairro.trim().slice(0, 1000),
+      vereador_proponente: vereador_proponente.trim().slice(0, 200),
+      bairro_alvo: String(bairro_alvo).trim().slice(0, 120),
+      cidade_alvo: String(cidade_alvo).trim().slice(0, 120),
+      estado_alvo: estadoLimpo,
+      cep_alvo: String(cep_alvo).trim().slice(0, 20),
+      link_pdf_original: sanitizeExternalHttpsUrl(link_pdf_original),
+      fonte_diario: typeof fonte_diario === 'string' ? fonte_diario.trim().slice(0, 250) : null,
+      status: statusFinal,
       data_votacao,
       votos_concordar: 0,
       votos_discordar: 0,
     };
 
-    // Tenta gravar no Supabase usando supabaseAdmin
-    let pautaCriada: any = null;
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data, error } = await supabaseAdmin
+      .from('pautas_ia')
+      .insert([novaPauta])
+      .select()
+      .single();
 
-    try {
-      const { data, error } = await supabaseAdmin
-        .from('pautas_ia')
-        .insert([novaPauta])
-        .select()
-        .single();
-
-      if (!error && data) {
-        pautaCriada = data;
-      } else {
-        console.warn('supabaseAdmin insert retornou erro, tentando via REST direto:', error?.message);
-      }
-    } catch (adminErr: any) {
-      console.warn('Exceção ao usar supabaseAdmin:', adminErr.message);
-    }
-
-    // Se supabaseAdmin falhou, tenta REST direto com a service key (100% garantido)
-    if (!pautaCriada) {
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://fjtbdoeahdtellzbxpsy.supabase.co';
-      const serviceKey =
-        process.env.SUPABASE_SERVICE_ROLE_KEY ||
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-        '';
-
-      try {
-        const restRes = await fetch(`${supabaseUrl}/rest/v1/pautas_ia`, {
-          method: 'POST',
-          headers: {
-            apikey: serviceKey,
-            Authorization: `Bearer ${serviceKey}`,
-            'Content-Type': 'application/json',
-            Prefer: 'return=representation',
-          },
-          body: JSON.stringify(novaPauta),
-        });
-
-        if (restRes.ok) {
-          const restData = await restRes.json();
-          pautaCriada = Array.isArray(restData) ? restData[0] : restData;
-        } else {
-          const errText = await restRes.text();
-          console.warn('REST direto falhou:', errText);
-        }
-      } catch (restErr: any) {
-        console.warn('Exceção ao usar REST direto:', restErr.message);
-      }
-    }
-
-    if (!pautaCriada) {
+    if (error || !data) {
+      console.error('Erro ao gravar pauta no Supabase:', error?.message);
       return NextResponse.json(
         { error: 'Não foi possível gravar a pauta no banco de dados Supabase.' },
         { status: 500 }
@@ -146,35 +133,41 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      pauta: pautaCriada,
+      pauta: data,
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Exceção em POST /api/pautas:', error?.message);
+    return NextResponse.json({ error: 'Erro interno ao publicar pauta.' }, { status: 500 });
   }
 }
 
-// DELETE: Remove uma pauta do ar
+// DELETE: Remove uma pauta do ar (restrito a Administradores)
 export async function DELETE(req: Request) {
   try {
+    const auth = await requireAdminUser();
+    if (!auth.ok) return auth.response;
+
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
 
-    if (!id) {
-      return NextResponse.json({ error: 'ID da pauta é obrigatório' }, { status: 400 });
+    if (!id || !UUID_REGEX.test(id)) {
+      return NextResponse.json({ error: 'ID da pauta inválido ou ausente.' }, { status: 400 });
     }
 
+    const supabaseAdmin = getSupabaseAdmin();
     const { error } = await supabaseAdmin
       .from('pautas_ia')
       .delete()
       .eq('id', id);
 
     if (error) {
-      // Tenta com cliente comum
-      await supabase.from('pautas_ia').delete().eq('id', id);
+      console.error('Erro ao deletar pauta:', error.message);
+      return NextResponse.json({ error: 'Falha ao remover pauta.' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, message: 'Pauta removida com sucesso.' });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Exceção em DELETE /api/pautas:', error?.message);
+    return NextResponse.json({ error: 'Erro interno ao remover pauta.' }, { status: 500 });
   }
 }

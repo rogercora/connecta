@@ -2,13 +2,36 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { MoreHorizontal, FileText, Check, X, ChevronDown, Megaphone, Sparkles, CheckCircle2 } from 'lucide-react';
+import {
+  MoreHorizontal,
+  FileText,
+  Check,
+  X,
+  ChevronDown,
+  Megaphone,
+  Sparkles,
+  CheckCircle2,
+  AlertCircle,
+} from 'lucide-react';
 import { PautaIA } from '@/types/database';
 import { DiscordarModal } from '@/components/votacao/DiscordarModal';
 import { useVoto } from '@/hooks/useVoto';
 
 interface PautaIACardProps {
   pauta: PautaIA;
+}
+
+function getSafeHref(url: string | null): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+      return parsed.toString();
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 export const PautaIACard: React.FC<PautaIACardProps> = ({ pauta }) => {
@@ -22,20 +45,24 @@ export const PautaIACard: React.FC<PautaIACardProps> = ({ pauta }) => {
     concordarCount,
     discordarCount,
     totalVotos,
+    isSubmitting,
+    voteError,
+    isAuthenticated,
     submitVote,
   } = useVoto(pauta.id, pauta.votos_concordar || 0, pauta.votos_discordar || 0);
 
   const handleConcordar = () => {
-    submitVote('concordar');
+    void submitVote('concordar');
   };
 
   const handleDiscordarSubmit = (motivo: string) => {
-    submitVote('discordar', motivo);
+    void submitVote('discordar', motivo);
   };
 
   const pctConcordar = totalVotos > 0 ? Math.round((concordarCount / totalVotos) * 100) : 50;
   const pctDiscordar = totalVotos > 0 ? 100 - pctConcordar : 50;
   const atingiuQuorum = discordarCount >= 50 || concordarCount >= 50;
+  const safePdfUrl = getSafeHref(pauta.link_pdf_original);
 
   return (
     <>
@@ -61,7 +88,7 @@ export const PautaIACard: React.FC<PautaIACardProps> = ({ pauta }) => {
           {pauta.titulo}
         </h3>
 
-        {/* Bloco de Resumo Inteligente com borda arredondada */}
+        {/* Bloco de Resumo Inteligente */}
         <div className="border border-zinc-200 rounded-2xl p-3.5 bg-zinc-50/50 mb-3 text-xs leading-relaxed text-zinc-800 shadow-2xs">
           <div className="flex items-start space-x-1.5 mb-2">
             <Sparkles className="w-4 h-4 text-crimson-600 shrink-0 mt-0.5" />
@@ -87,7 +114,7 @@ export const PautaIACard: React.FC<PautaIACardProps> = ({ pauta }) => {
         <div className="grid grid-cols-2 gap-2.5 mb-2">
           <button
             onClick={handleConcordar}
-            disabled={hasVoted}
+            disabled={hasVoted || isSubmitting}
             className={`flex items-center justify-center space-x-1.5 py-3 px-3 rounded-full font-black text-xs transition-all shadow-crimson-btn cursor-pointer ${
               userVote === 'concordar'
                 ? 'bg-crimson-800 text-white ring-2 ring-crimson-500'
@@ -100,7 +127,7 @@ export const PautaIACard: React.FC<PautaIACardProps> = ({ pauta }) => {
 
           <button
             onClick={() => setModalOpen(true)}
-            disabled={hasVoted}
+            disabled={hasVoted || isSubmitting}
             className={`flex items-center justify-center space-x-1.5 py-3 px-3 rounded-full font-black text-xs transition-all shadow-sm cursor-pointer ${
               userVote === 'discordar'
                 ? 'bg-zinc-800 text-white ring-2 ring-zinc-500'
@@ -112,12 +139,27 @@ export const PautaIACard: React.FC<PautaIACardProps> = ({ pauta }) => {
           </button>
         </div>
 
+        {/* Mensagem de erro/permissão no voto */}
+        {voteError && (
+          <div className="mb-3 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-900 flex items-center justify-between gap-2">
+            <div className="flex items-center space-x-1.5">
+              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>{voteError}</span>
+            </div>
+            {!isAuthenticated && (
+              <Link href="/login?next=/acoes" className="font-bold text-crimson-700 underline shrink-0">
+                Entrar
+              </Link>
+            )}
+          </div>
+        )}
+
         {/* Legenda de Consenso */}
         <p className="text-[10.5px] text-zinc-500 text-center mb-3 font-medium">
           Concordar registra aprovação do governo. Discordar soma assinatura para abrir abaixo-assinado com 50 votos.
         </p>
 
-        {/* Placar Cívico em Tempo Real (ativado após o voto) */}
+        {/* Placar Cívico em Tempo Real */}
         {hasVoted && (
           <div className="mb-3.5 p-3.5 bg-zinc-50 border border-zinc-200/90 rounded-2xl space-y-2.5 animate-fadeIn">
             <div className="flex items-center justify-between text-xs font-bold">
@@ -134,7 +176,6 @@ export const PautaIACard: React.FC<PautaIACardProps> = ({ pauta }) => {
               </p>
             )}
 
-            {/* Barra de Consenso da Comunidade */}
             <div className="w-full bg-zinc-200 h-2.5 rounded-full overflow-hidden flex">
               <div
                 className="bg-crimson-600 h-full transition-all duration-700"
@@ -185,23 +226,23 @@ export const PautaIACard: React.FC<PautaIACardProps> = ({ pauta }) => {
           </button>
         </div>
 
-        {/* Diário Oficial Expandido (se clicado) */}
         {showOriginal && (
           <div className="mt-3 p-3 bg-zinc-50 rounded-2xl border border-zinc-200 text-[11px] text-zinc-600 space-y-1">
             <p className="font-bold text-zinc-950">
               {pauta.fonte_diario || 'Diário Oficial Eletrônico do Município'}
             </p>
-            <p className="font-mono text-[10px] line-clamp-3 text-zinc-600">
-              PROJETO DE LEI Nº 512/2026 - Dispõe sobre a readequação das diretrizes urbanísticas dos lotes situados na Rua Silva Bueno...
-            </p>
-            <a
-              href={pauta.link_pdf_original || '#'}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-block text-crimson-600 font-bold hover:underline pt-1"
-            >
-              Abrir PDF original completo →
-            </a>
+            {safePdfUrl ? (
+              <a
+                href={safePdfUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="inline-block text-crimson-600 font-bold hover:underline pt-1"
+              >
+                Abrir PDF original completo →
+              </a>
+            ) : (
+              <span className="inline-block text-zinc-400 pt-1">Link oficial indisponível.</span>
+            )}
           </div>
         )}
       </article>
