@@ -238,87 +238,109 @@ export async function POST(req: Request) {
         : buildSummarizerPrompt(input);
 
     // Chave Gemini lida exclusivamente do ambiente do servidor (nunca do cliente/localStorage)
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = (process.env.GEMINI_API_KEY || '').trim().replace(/^["']|["']$/g, '');
+    let geminiErrorDetail: string | null = null;
 
     if (apiKey) {
-      try {
-        const geminiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
-        const parts: any[] = [{ text: effectivePrompt }];
+      const candidateModels = Array.from(
+        new Set(
+          [
+            (process.env.GEMINI_MODEL || '').trim(),
+            'gemini-3.8-flash',
+            'gemini-3.5-flash',
+            'gemini-2.5-flash',
+          ].filter(Boolean)
+        )
+      );
 
-        if (finalPdfBase64) {
-          const cleanBase64 = finalPdfBase64.replace(/^data:application\/pdf;base64,/, '');
-          parts.push({
-            inlineData: {
-              mimeType: 'application/pdf',
-              data: cleanBase64,
-            },
-          });
-        }
+      const parts: any[] = [{ text: effectivePrompt }];
 
-        const geminiRes = await fetch(geminiUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': apiKey,
+      if (finalPdfBase64) {
+        const cleanBase64 = finalPdfBase64.replace(/^data:application\/pdf;base64,/, '');
+        parts.push({
+          inlineData: {
+            mimeType: 'application/pdf',
+            data: cleanBase64,
           },
-          body: JSON.stringify({
-            contents: [{ role: 'user', parts }],
-            generationConfig: {
-              temperature: 0.2,
-              responseMimeType: 'application/json',
-            },
-          }),
-          signal: AbortSignal.timeout(30000),
         });
+      }
 
-        if (geminiRes.ok) {
-          const geminiData = await geminiRes.json();
-          const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
+      for (const modelName of candidateModels) {
+        try {
+          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
 
-          if (rawText) {
-            let pautasGemini: PautaIASummarized[] = [];
-            try {
-              const parsed = JSON.parse(rawText);
-              const rawList = Array.isArray(parsed)
-                ? parsed
-                : Array.isArray(parsed.pautas)
-                ? parsed.pautas
-                : [parsed];
+          const geminiRes = await fetch(geminiUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': apiKey,
+            },
+            body: JSON.stringify({
+              contents: [{ role: 'user', parts }],
+              generationConfig: {
+                temperature: 0.2,
+                responseMimeType: 'application/json',
+              },
+            }),
+            signal: AbortSignal.timeout(30000),
+          });
 
-              pautasGemini = rawList.map((item: any, idx: number) => ({
-                id_temp: `pauta_${Date.now()}_${idx}`,
-                titulo: item.titulo || 'ALERTA CIDADÃO: Ato Oficial',
-                resumo_ia: item.resumo_ia || item.resumo || '',
-                impacto_bairro: item.impacto_bairro || item.impacto || '',
-                vereador_proponente: item.vereador_proponente || item.autor || `Prefeitura de ${municipioEfetivo}`,
-                bairro_alvo: item.bairro_alvo || bairro_sugerido || 'Centro',
-                cidade_alvo: item.cidade_alvo || municipioEfetivo,
-                estado_alvo: item.estado_alvo || String(estado || 'SP'),
-                relevancia_score: item.relevancia_score || 85,
-                tags: Array.isArray(item.tags) ? item.tags : ['legislação'],
-                categoria: item.categoria || 'geral',
-              }));
-            } catch (err) {
-              console.warn('Erro ao interpretar JSON do Gemini:', err);
+          if (geminiRes.ok) {
+            const geminiData = await geminiRes.json();
+            const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
+
+            if (rawText) {
+              let pautasGemini: PautaIASummarized[] = [];
+              try {
+                const parsed = JSON.parse(rawText);
+                const rawList = Array.isArray(parsed)
+                  ? parsed
+                  : Array.isArray(parsed.pautas)
+                  ? parsed.pautas
+                  : [parsed];
+
+                pautasGemini = rawList.map((item: any, idx: number) => ({
+                  id_temp: `pauta_${Date.now()}_${idx}`,
+                  titulo: item.titulo || 'ALERTA CIDADÃO: Ato Oficial',
+                  resumo_ia: item.resumo_ia || item.resumo || '',
+                  impacto_bairro: item.impacto_bairro || item.impacto || '',
+                  vereador_proponente: item.vereador_proponente || item.autor || `Prefeitura de ${municipioEfetivo}`,
+                  bairro_alvo: item.bairro_alvo || bairro_sugerido || 'Centro',
+                  cidade_alvo: item.cidade_alvo || municipioEfetivo,
+                  estado_alvo: item.estado_alvo || String(estado || 'SP'),
+                  relevancia_score: item.relevancia_score || 85,
+                  tags: Array.isArray(item.tags) ? item.tags : ['legislação'],
+                  categoria: item.categoria || 'geral',
+                }));
+              } catch (err) {
+                geminiErrorDetail = `Resposta JSON inválida do modelo ${modelName}`;
+                console.warn('Erro ao interpretar JSON do Gemini:', err);
+              }
+
+              if (pautasGemini.length > 0) {
+                return NextResponse.json({
+                  success: true,
+                  source: finalPdfBase64 ? `${modelName} (pdf-multimodal)` : modelName,
+                  is_real_ai: true,
+                  total_pautas: pautasGemini.length,
+                  pautas: pautasGemini,
+                  pauta: pautasGemini[0],
+                });
+              }
             }
-
-            if (pautasGemini.length > 0) {
-              return NextResponse.json({
-                success: true,
-                source: finalPdfBase64 ? 'gemini-1.5-flash (pdf-multimodal)' : 'gemini-1.5-flash',
-                is_real_ai: true,
-                total_pautas: pautasGemini.length,
-                pautas: pautasGemini,
-                pauta: pautasGemini[0],
-              });
+          } else {
+            const errText = await geminiRes.text();
+            geminiErrorDetail = `${modelName} HTTP ${geminiRes.status}: ${errText.slice(0, 220)}`;
+            console.warn('Gemini API call failed:', geminiErrorDetail);
+            // Se a própria API key é inválida, não adianta tentar os outros modelos
+            if (geminiRes.status === 400 && errText.toLowerCase().includes('api key not valid')) {
+              break;
             }
           }
-        } else {
-          const errText = await geminiRes.text();
-          console.warn('Gemini API call failed, falling back to heuristic engine:', errText);
+        } catch (geminiError: any) {
+          geminiErrorDetail = `${modelName}: ${geminiError?.message || 'Erro de conexão'}`;
+          console.warn('Erro ao conectar ao Gemini:', geminiErrorDetail);
         }
-      } catch (geminiError: any) {
-        console.warn('Erro ao conectar ao Gemini, usando motor heurístico local:', geminiError.message);
       }
     }
 
@@ -445,9 +467,10 @@ export async function POST(req: Request) {
       total_pautas: pautasHeuristicas.length,
       pautas: pautasHeuristicas,
       pauta: pautasHeuristicas[0],
+      gemini_error: geminiErrorDetail,
       note: apiKey
-        ? 'Chave configurada no servidor, mas a chamada ao Gemini falhou e respondeu com motor de contingência.'
-        : 'Processado com o Extrator Local Inteligente. Para habilitar o Google Gemini 1.5 Flash, configure GEMINI_API_KEY nas variáveis de ambiente do servidor.',
+        ? `Chave configurada no servidor, mas a chamada ao Gemini falhou (${geminiErrorDetail || 'erro desconhecido'}).`
+        : 'Processado com o Extrator Local Inteligente. Para habilitar o Google Gemini Flash, configure GEMINI_API_KEY nas variáveis de ambiente do servidor.',
     });
   } catch (error: any) {
     console.error('Erro em POST /api/ia/summarize:', error?.message);

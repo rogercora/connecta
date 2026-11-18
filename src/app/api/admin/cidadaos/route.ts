@@ -11,29 +11,48 @@ export async function GET() {
     const auth = await requireAdminUser();
     if (!auth.ok) return auth.response;
 
-    const supabaseAdmin = getSupabaseAdmin();
-    const { data, error } = await supabaseAdmin
-      .from('users')
-      .select('id, nome_completo, email, phone, cep, bairro, cidade, estado, nivel_verificacao, role, created_at')
-      .order('created_at', { ascending: false })
-      .limit(100);
+    const serverConfig = {
+      geminiConfigured: Boolean((process.env.GEMINI_API_KEY || '').trim()),
+      cronSecretConfigured: Boolean((process.env.CRON_SECRET || '').trim()),
+      serviceRoleConfigured: Boolean((process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim()),
+    };
 
-    if (error) {
-      console.error('Erro ao listar cidadãos:', error.message);
-      return NextResponse.json({ error: 'Erro ao consultar cidadãos.' }, { status: 500 });
+    try {
+      const supabaseAdmin = getSupabaseAdmin();
+      const { data, error } = await supabaseAdmin
+        .from('users')
+        .select('id, nome_completo, email, phone, cep, bairro, cidade, estado, nivel_verificacao, role, created_at')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (error) {
+        console.error('Erro ao listar cidadãos via supabaseAdmin:', error.message);
+        return NextResponse.json({
+          cidadaos: [],
+          currentAdminId: auth.authUser.id,
+          adminDbError: `Erro no Supabase ao consultar cidadãos: ${error.message}`,
+          serverConfig,
+        });
+      }
+
+      return NextResponse.json({
+        cidadaos: data ?? [],
+        currentAdminId: auth.authUser.id,
+        adminDbError: null,
+        serverConfig,
+      });
+    } catch (adminErr: any) {
+      console.error('Exceção ao inicializar getSupabaseAdmin:', adminErr?.message);
+      return NextResponse.json({
+        cidadaos: [],
+        currentAdminId: auth.authUser.id,
+        adminDbError: adminErr?.message || 'Falha na configuração de SUPABASE_SERVICE_ROLE_KEY.',
+        serverConfig,
+      });
     }
-
-    return NextResponse.json({
-      cidadaos: data ?? [],
-      currentAdminId: auth.authUser.id,
-      serverConfig: {
-        geminiConfigured: Boolean(process.env.GEMINI_API_KEY),
-        cronSecretConfigured: Boolean(process.env.CRON_SECRET),
-      },
-    });
   } catch (error: any) {
     console.error('Erro em GET /api/admin/cidadaos:', error?.message);
-    return NextResponse.json({ error: 'Erro interno no painel admin.' }, { status: 500 });
+    return NextResponse.json({ error: error?.message || 'Erro interno no painel admin.' }, { status: 500 });
   }
 }
 

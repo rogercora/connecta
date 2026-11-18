@@ -135,7 +135,14 @@ export default function AdminPage() {
   const [serverConfig, setServerConfig] = useState<{
     geminiConfigured: boolean;
     cronSecretConfigured: boolean;
-  }>({ geminiConfigured: false, cronSecretConfigured: false });
+    serviceRoleConfigured: boolean;
+  }>({ geminiConfigured: false, cronSecretConfigured: false, serviceRoleConfigured: false });
+  const [adminApiError, setAdminApiError] = useState<string | null>(null);
+  const [testingGemini, setTestingGemini] = useState(false);
+  const [geminiTestResult, setGeminiTestResult] = useState<{
+    ok: boolean;
+    message: string;
+  } | null>(null);
 
   // Estado da API do Diário Oficial de SJC
   const [edicoesSJC, setEdicoesSJC] = useState<EdicaoSJC[]>([]);
@@ -182,20 +189,75 @@ export default function AdminPage() {
 
   const carregarCidadaosEStatus = async () => {
     setLoadingCidadaos(true);
+    setAdminApiError(null);
     try {
       const res = await fetch('/api/admin/cidadaos');
-      if (res.ok) {
-        const data = await res.json();
-        setCidadaos(data.cidadaos || []);
-        if (data.currentAdminId) setCurrentAdminId(data.currentAdminId);
-        if (data.serverConfig) {
-          setServerConfig(data.serverConfig);
-        }
+      const data = await res.json().catch(() => ({}));
+
+      if (data.serverConfig) {
+        setServerConfig(data.serverConfig);
       }
-    } catch (err) {
-      console.warn('Erro ao carregar cidadãos/status admin:', err);
+
+      if (!res.ok) {
+        setAdminApiError(data.error || `Falha HTTP ${res.status} ao consultar /api/admin/cidadaos.`);
+        return;
+      }
+
+      if (data.adminDbError) {
+        setAdminApiError(data.adminDbError);
+      }
+
+      setCidadaos(data.cidadaos || []);
+      if (data.currentAdminId) setCurrentAdminId(data.currentAdminId);
+    } catch (err: any) {
+      setAdminApiError(err?.message || 'Erro de rede ao consultar o servidor admin.');
     } finally {
       setLoadingCidadaos(false);
+    }
+  };
+
+  const handleTestarGemini = async () => {
+    setTestingGemini(true);
+    setGeminiTestResult(null);
+    try {
+      const res = await fetch('/api/ia/summarize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          texto_bruto:
+            'CONTRATO Nº 10/2026 - PREGÃO ELETRÔNICO Nº 05/2026 - Secretaria de Obras de São José dos Campos. Objeto: recapeamento asfáltico no Jardim Aquárius. VALOR: R$ 1.200.000,00.',
+          municipio: 'São José dos Campos',
+          estado: 'SP',
+          fonte_nome: 'Teste Diagnóstico Admin',
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setGeminiTestResult({
+          ok: false,
+          message: `HTTP ${res.status}: ${data.error || 'Falha na chamada.'}`,
+        });
+        return;
+      }
+
+      if (data.is_real_ai) {
+        setGeminiTestResult({
+          ok: true,
+          message: `Conectado com sucesso! Modelo ativo: ${data.source}.`,
+        });
+      } else {
+        setGeminiTestResult({
+          ok: false,
+          message: data.note || data.gemini_error || 'Respondeu pelo extrator local.',
+        });
+      }
+    } catch (err: any) {
+      setGeminiTestResult({
+        ok: false,
+        message: err?.message || 'Erro de rede ao testar Gemini.',
+      });
+    } finally {
+      setTestingGemini(false);
     }
   };
 
@@ -863,7 +925,10 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
         </button>
 
         <button
-          onClick={() => setActiveTab('config')}
+          onClick={() => {
+            setActiveTab('config');
+            void carregarCidadaosEStatus();
+          }}
           className={`py-3 px-2 sm:px-4 text-xs sm:text-sm font-black border-b-2 flex items-center space-x-2 transition-all whitespace-nowrap ${
             activeTab === 'config'
               ? 'border-crimson-600 text-crimson-800'
@@ -911,7 +976,7 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
                 </h3>
                 <span className="text-[10px] font-bold text-crimson-700">
                   {fonteIA?.includes('gemini')
-                    ? '✨ Segmentado com o modelo Google Gemini 1.5 Flash'
+                    ? `✨ Segmentado com o modelo Google ${fonteIA}`
                     : '🔍 Segmentado pelo Extrator Local Inteligente (Motor de contingência)'}
                 </span>
               </div>
@@ -1817,6 +1882,12 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
             </div>
           </div>
 
+          {adminApiError && (
+            <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs font-medium text-red-800">
+              <strong>Erro de Servidor/Banco:</strong> {adminApiError}
+            </div>
+          )}
+
           {adminCreateMsg && (
             <div className="p-3 rounded-xl bg-crimson-50 border border-crimson-200 text-xs font-bold text-crimson-900">
               {adminCreateMsg}
@@ -1986,39 +2057,95 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
             </div>
           )}
 
+          {adminApiError && (
+            <div className="p-3 bg-red-50 border border-red-200 text-red-800 rounded-xl text-xs font-medium">
+              <strong>Erro ao consultar servidor:</strong> {adminApiError}
+            </div>
+          )}
+
           {/* Status das Variáveis no Servidor */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-            <div className="p-3 rounded-xl border border-gray-200 bg-gray-50 flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Key className="w-4 h-4 text-crimson-600" />
-                <span className="font-bold text-gray-800">GEMINI_API_KEY (Servidor)</span>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+            <div className="p-3 rounded-xl border border-gray-200 bg-gray-50 flex items-center justify-between gap-2">
+              <div className="flex items-center space-x-2 min-w-0">
+                <Key className="w-4 h-4 text-crimson-600 shrink-0" />
+                <span className="font-bold text-gray-800 truncate">GEMINI_API_KEY</span>
               </div>
               <span
-                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
                   serverConfig.geminiConfigured
                     ? 'bg-crimson-100 text-crimson-800'
                     : 'bg-amber-100 text-amber-900'
                 }`}
               >
-                {serverConfig.geminiConfigured ? 'Configurada' : 'Ausente (Modo Local)'}
+                {serverConfig.geminiConfigured ? 'Configurada' : 'Ausente'}
               </span>
             </div>
 
-            <div className="p-3 rounded-xl border border-gray-200 bg-gray-50 flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <ShieldCheck className="w-4 h-4 text-crimson-600" />
-                <span className="font-bold text-gray-800">CRON_SECRET (Servidor)</span>
+            <div className="p-3 rounded-xl border border-gray-200 bg-gray-50 flex items-center justify-between gap-2">
+              <div className="flex items-center space-x-2 min-w-0">
+                <ShieldCheck className="w-4 h-4 text-crimson-600 shrink-0" />
+                <span className="font-bold text-gray-800 truncate">CRON_SECRET</span>
               </div>
               <span
-                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
                   serverConfig.cronSecretConfigured
                     ? 'bg-crimson-100 text-crimson-800'
                     : 'bg-amber-100 text-amber-900'
                 }`}
               >
-                {serverConfig.cronSecretConfigured ? 'Configurada' : 'Ausente (Cron bloqueado)'}
+                {serverConfig.cronSecretConfigured ? 'Configurada' : 'Ausente'}
               </span>
             </div>
+
+            <div className="p-3 rounded-xl border border-gray-200 bg-gray-50 flex items-center justify-between gap-2">
+              <div className="flex items-center space-x-2 min-w-0">
+                <ShieldCheck className="w-4 h-4 text-crimson-600 shrink-0" />
+                <span className="font-bold text-gray-800 truncate">SERVICE_ROLE_KEY</span>
+              </div>
+              <span
+                className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
+                  serverConfig.serviceRoleConfigured
+                    ? 'bg-crimson-100 text-crimson-800'
+                    : 'bg-amber-100 text-amber-900'
+                }`}
+              >
+                {serverConfig.serviceRoleConfigured ? 'Configurada' : 'Ausente'}
+              </span>
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-xl border border-gray-200 bg-neutral-50 space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <p className="text-xs font-bold text-gray-900">Teste ao Vivo da API Gemini</p>
+                <p className="text-[11px] text-gray-500">
+                  Verifica se a chave configurada na Vercel responde normalmente pelo modelo atual do Google Gemini Flash.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                isLoading={testingGemini}
+                onClick={handleTestarGemini}
+                className="py-2 px-3 rounded-xl text-xs font-bold shrink-0"
+              >
+                <Sparkles className="w-3.5 h-3.5 mr-1.5 text-crimson-600" />
+                <span>Testar IA Gemini Agora</span>
+              </Button>
+            </div>
+
+            {geminiTestResult && (
+              <div
+                className={`p-2.5 rounded-lg text-xs font-medium ${
+                  geminiTestResult.ok
+                    ? 'bg-crimson-50 text-crimson-900 border border-crimson-200'
+                    : 'bg-amber-50 text-amber-950 border border-amber-200'
+                }`}
+              >
+                {geminiTestResult.ok ? '✅ ' : '⚠️ '}
+                {geminiTestResult.message}
+              </div>
+            )}
           </div>
 
           {/* Prompt de Sistema */}

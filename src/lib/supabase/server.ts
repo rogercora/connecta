@@ -5,9 +5,14 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 const DEFAULT_SUPABASE_URL = 'https://fjtbdoeahdtellzbxpsy.supabase.co';
 const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_3TfAipTG33KDBTbsgzP9oQ_aDipKcny';
 
+function cleanEnvValue(value: string | undefined): string {
+  return (value || '').trim().replace(/^["']|["']$/g, '');
+}
+
 function getPublicSupabaseEnv() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
+  const supabaseUrl = cleanEnvValue(process.env.NEXT_PUBLIC_SUPABASE_URL) || DEFAULT_SUPABASE_URL;
+  const supabaseAnonKey =
+    cleanEnvValue(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) || DEFAULT_SUPABASE_ANON_KEY;
   return { supabaseUrl, supabaseAnonKey };
 }
 
@@ -44,8 +49,8 @@ let cachedAdminClient: SupabaseClient | null = null;
 export function getSupabaseAdmin(): SupabaseClient {
   if (cachedAdminClient) return cachedAdminClient;
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = cleanEnvValue(process.env.NEXT_PUBLIC_SUPABASE_URL) || DEFAULT_SUPABASE_URL;
+  const serviceRoleKey = cleanEnvValue(process.env.SUPABASE_SERVICE_ROLE_KEY);
 
   if (!serviceRoleKey) {
     throw new Error(
