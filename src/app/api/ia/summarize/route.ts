@@ -239,7 +239,70 @@ export async function POST(req: Request) {
 
     // Chave Gemini lida exclusivamente do ambiente do servidor (nunca do cliente/localStorage)
     const apiKey = (process.env.GEMINI_API_KEY || '').trim().replace(/^["']|["']$/g, '');
-    let geminiErrorDetail: string | null = null;
+    const geminiErrors: string[] = [];
+
+    const extractGeminiJsonText = (geminiData: any): string | null => {
+      const parts = geminiData?.candidates?.[0]?.content?.parts;
+      if (!Array.isArray(parts)) return null;
+      const answerParts = parts.filter((p: any) => !p?.thought && typeof p?.text === 'string');
+      const raw = (answerParts.length > 0 ? answerParts : parts)
+        .map((p: any) => p?.text || '')
+        .join('\n')
+        .trim();
+      return raw || null;
+    };
+
+    const parseGeminiJsonPayload = (rawText: string): any => {
+      const cleaned = rawText
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/i, '')
+        .replace(/\s*```$/i, '')
+        .trim();
+      try {
+        return JSON.parse(cleaned);
+      } catch {
+        const firstBrace = cleaned.indexOf('{');
+        const firstBracket = cleaned.indexOf('[');
+        const start =
+          firstBrace === -1
+            ? firstBracket
+            : firstBracket === -1
+            ? firstBrace
+            : Math.min(firstBrace, firstBracket);
+        const lastBrace = cleaned.lastIndexOf('}');
+        const lastBracket = cleaned.lastIndexOf(']');
+        const end = Math.max(lastBrace, lastBracket);
+        if (start !== -1 && end > start) {
+          return JSON.parse(cleaned.slice(start, end + 1));
+        }
+        throw new Error('JSON não encontrado na resposta');
+      }
+    };
+
+    const discoverAvailableFlashModel = async (alreadyTried: Set<string>): Promise<string[]> => {
+      try {
+        const listRes = await fetch('https://generativelanguage.googleapis.com/v1beta/models', {
+          headers: { 'x-goog-api-key': apiKey },
+          signal: AbortSignal.timeout(8000),
+        });
+        if (!listRes.ok) return [];
+        const listData = await listRes.json();
+        const models = Array.isArray(listData?.models) ? listData.models : [];
+        return models
+          .filter(
+            (m: any) =>
+              typeof m?.name === 'string' &&
+              m.name.includes('flash') &&
+              Array.isArray(m.supportedGenerationMethods) &&
+              m.supportedGenerationMethods.includes('generateContent')
+          )
+          .map((m: any) => m.name.replace(/^models\//, ''))
+          .filter((name: string) => !alreadyTried.has(name))
+          .slice(0, 3);
+      } catch {
+        return [];
+      }
+    };
 
     if (apiKey) {
       const candidateModels = Array.from(
@@ -247,8 +310,8 @@ export async function POST(req: Request) {
           [
             (process.env.GEMINI_MODEL || '').trim(),
             'gemini-3.8-flash',
-            'gemini-3.5-flash',
-            'gemini-2.5-flash',
+            'gemini-3.5-flash-lite',
+            'gemini-flash-latest',
           ].filter(Boolean)
         )
       );
@@ -265,7 +328,7 @@ export async function POST(req: Request) {
         });
       }
 
-      for (const modelName of candidateModels) {
+      const tryModel = async (modelName: string) => {
         try {
           const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
 
@@ -287,19 +350,18 @@ export async function POST(req: Request) {
 
           if (geminiRes.ok) {
             const geminiData = await geminiRes.json();
-            const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
+            const rawText = extractGeminiJsonText(geminiData);
 
             if (rawText) {
-              let pautasGemini: PautaIASummarized[] = [];
               try {
-                const parsed = JSON.parse(rawText);
+                const parsed = parseGeminiJsonPayload(rawText);
                 const rawList = Array.isArray(parsed)
                   ? parsed
                   : Array.isArray(parsed.pautas)
                   ? parsed.pautas
                   : [parsed];
 
-                pautasGemini = rawList.map((item: any, idx: number) => ({
+                const pautasGemini: PautaIASummarized[] = rawList.map((item: any, idx: number) => ({
                   id_temp: `pauta_${Date.now()}_${idx}`,
                   titulo: item.titulo || 'ALERTA CIDADÃO: Ato Oficial',
                   resumo_ia: item.resumo_ia || item.resumo || '',
@@ -312,37 +374,64 @@ export async function POST(req: Request) {
                   tags: Array.isArray(item.tags) ? item.tags : ['legislação'],
                   categoria: item.categoria || 'geral',
                 }));
+
+                if (pautasGemini.length > 0) {
+                  return NextResponse.json({
+                    success: true,
+                    source: finalPdfBase64 ? `${modelName} (pdf-multimodal)` : modelName,
+                    is_real_ai: true,
+                    total_pautas: pautasGemini.length,
+                    pautas: pautasGemini,
+                    pauta: pautasGemini[0],
+                  });
+                }
               } catch (err) {
-                geminiErrorDetail = `Resposta JSON inválida do modelo ${modelName}`;
+                geminiErrors.push(`${modelName}: JSON inválido (${rawText.slice(0, 120)})`);
                 console.warn('Erro ao interpretar JSON do Gemini:', err);
               }
-
-              if (pautasGemini.length > 0) {
-                return NextResponse.json({
-                  success: true,
-                  source: finalPdfBase64 ? `${modelName} (pdf-multimodal)` : modelName,
-                  is_real_ai: true,
-                  total_pautas: pautasGemini.length,
-                  pautas: pautasGemini,
-                  pauta: pautasGemini[0],
-                });
-              }
+            } else {
+              geminiErrors.push(`${modelName}: resposta sem texto`);
             }
           } else {
             const errText = await geminiRes.text();
-            geminiErrorDetail = `${modelName} HTTP ${geminiRes.status}: ${errText.slice(0, 220)}`;
-            console.warn('Gemini API call failed:', geminiErrorDetail);
-            // Se a própria API key é inválida, não adianta tentar os outros modelos
+            const detail = `${modelName} HTTP ${geminiRes.status}: ${errText.slice(0, 180)}`;
+            geminiErrors.push(detail);
+            console.warn('Gemini API call failed:', detail);
             if (geminiRes.status === 400 && errText.toLowerCase().includes('api key not valid')) {
-              break;
+              return 'INVALID_KEY' as const;
             }
           }
         } catch (geminiError: any) {
-          geminiErrorDetail = `${modelName}: ${geminiError?.message || 'Erro de conexão'}`;
-          console.warn('Erro ao conectar ao Gemini:', geminiErrorDetail);
+          const detail = `${modelName}: ${geminiError?.message || 'Erro de conexão'}`;
+          geminiErrors.push(detail);
+          console.warn('Erro ao conectar ao Gemini:', detail);
+        }
+        return null;
+      };
+
+      const tried = new Set<string>();
+      let keyInvalid = false;
+
+      for (const modelName of candidateModels) {
+        tried.add(modelName);
+        const result = await tryModel(modelName);
+        if (result === 'INVALID_KEY') {
+          keyInvalid = true;
+          break;
+        }
+        if (result) return result;
+      }
+
+      if (!keyInvalid) {
+        const discovered = await discoverAvailableFlashModel(tried);
+        for (const modelName of discovered) {
+          const result = await tryModel(modelName);
+          if (result && result !== 'INVALID_KEY') return result;
         }
       }
     }
+
+    const geminiErrorDetail = geminiErrors.length > 0 ? geminiErrors.join(' | ') : null;
 
     const extrairMultiplasPautas = (texto: string): PautaIASummarized[] => {
       const lower = texto.toLowerCase();
