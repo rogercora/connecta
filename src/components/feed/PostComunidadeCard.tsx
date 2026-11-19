@@ -4,9 +4,8 @@ import React, { useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { Heart, MessageCircle, Send, Bookmark, MoreVertical, Check, Megaphone, FileText } from 'lucide-react';
-import { PostComunidade } from '@/types/database';
-import { useFeedStore } from '@/stores/feedStore';
+import { Heart, MessageCircle, Send, Bookmark, MoreVertical, Check, Megaphone, FileText, Trash2 } from 'lucide-react';
+import { PostComunidade, Comentario } from '@/types/database';
 import { useAuthStore } from '@/stores/authStore';
 import { supabase } from '@/lib/supabase/client';
 
@@ -17,22 +16,121 @@ interface PostComunidadeCardProps {
 export const PostComunidadeCard: React.FC<PostComunidadeCardProps> = ({ post }) => {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [liked, setLiked] = useState(false);
-  const curtirPost = useFeedStore((s) => s.curtirPost);
-  const toggleApoiarPost = useFeedStore((s) => s.toggleApoiarPost);
+  const [liked, setLiked] = useState(!!post.user_ja_curtiu);
+  const [likesCount, setLikesCount] = useState(post.curtidas || 0);
+  const [isUpdatingLike, setIsUpdatingLike] = useState(false);
   const currentUser = useAuthStore((s) => s.user);
 
-  // Estado local para "Também me afeta (+1)"
+  // Estado para "Também me afeta (+1)"
   const [apoiado, setApoiado] = useState(!!post.user_ja_apoiou);
   const [moradoresCount, setMoradoresCount] = useState(post.moradores_afetados || 1);
   const [isUpdatingApoio, setIsUpdatingApoio] = useState(false);
 
-  const handleLike = () => {
-    if (!liked) {
-      curtirPost(post.id);
-      setLiked(true);
-    } else {
-      setLiked(false);
+  // Comentários reais
+  const [showComments, setShowComments] = useState(false);
+  const [comments, setComments] = useState<Comentario[]>([]);
+  const [commentsCount, setCommentsCount] = useState(post.comentarios_count ?? 0);
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [newComment, setNewComment] = useState('');
+  const [submittingComment, setSubmittingComment] = useState(false);
+
+  const loadComments = async () => {
+    setLoadingComments(true);
+    try {
+      const { data, error } = await supabase
+        .from('comentarios')
+        .select('*, user:perfis_publicos(nome_completo, avatar_url, nivel_verificacao)')
+        .eq('post_id', post.id)
+        .order('created_at', { ascending: true });
+      if (!error && data) {
+        setComments(data as unknown as Comentario[]);
+        setCommentsCount(data.length);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoadingComments(false);
+    }
+  };
+
+  const handleToggleComments = () => {
+    const next = !showComments;
+    setShowComments(next);
+    if (next && comments.length === 0) {
+      void loadComments();
+    }
+  };
+
+  const handleSubmitComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser?.id) {
+      alert('Entre na sua conta para comentar nas ocorrências do bairro.');
+      router.push('/login?next=/feed');
+      return;
+    }
+    const text = newComment.trim();
+    if (!text) return;
+    setSubmittingComment(true);
+    try {
+      const { data, error } = await supabase
+        .from('comentarios')
+        .insert({
+          post_id: post.id,
+          user_id: currentUser.id,
+          conteudo: text.slice(0, 600),
+        })
+        .select('*, user:perfis_publicos(nome_completo, avatar_url, nivel_verificacao)')
+        .single();
+      if (!error && data) {
+        setComments((prev) => [...prev, data as unknown as Comentario]);
+        setCommentsCount((prev) => prev + 1);
+        setNewComment('');
+        void queryClient.invalidateQueries({ queryKey: ['posts'] });
+      } else {
+        alert(error?.message || 'Erro ao enviar comentário.');
+      }
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    const { error } = await supabase.from('comentarios').delete().eq('id', commentId);
+    if (!error) {
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
+      setCommentsCount((prev) => Math.max(0, prev - 1));
+      void queryClient.invalidateQueries({ queryKey: ['posts'] });
+    }
+  };
+
+  const handleLike = async () => {
+    if (!currentUser?.id) {
+      alert('Entre na sua conta para curtir ocorrências do bairro.');
+      router.push('/login?next=/feed');
+      return;
+    }
+    if (isUpdatingLike) return;
+    setIsUpdatingLike(true);
+    const nextLiked = !liked;
+    setLiked(nextLiked);
+    setLikesCount((prev) => Math.max(0, prev + (nextLiked ? 1 : -1)));
+
+    try {
+      const { data, error } = await supabase.rpc('toggle_curtir_post', {
+        p_post_id: post.id,
+      });
+      if (!error && data) {
+        setLiked(Boolean(data.curtido));
+        if (typeof data.curtidas === 'number') {
+          setLikesCount(data.curtidas);
+        }
+        void queryClient.invalidateQueries({ queryKey: ['posts'] });
+      }
+    } catch {
+      setLiked(!nextLiked);
+      setLikesCount((prev) => Math.max(0, prev + (nextLiked ? -1 : 1)));
+    } finally {
+      setIsUpdatingLike(false);
     }
   };
 
@@ -52,7 +150,6 @@ export const PostComunidadeCard: React.FC<PostComunidadeCardProps> = ({ post }) 
 
     setApoiado(novoEstado);
     setMoradoresCount(novoTotal);
-    toggleApoiarPost(post.id);
 
     try {
       const { data, error } = await supabase.rpc('toggle_apoiar_post', {
@@ -205,10 +302,30 @@ export const PostComunidadeCard: React.FC<PostComunidadeCardProps> = ({ post }) 
           >
             <Heart className={`w-6 h-6 stroke-[1.8] ${liked ? 'fill-current' : ''}`} />
           </button>
-          <button aria-label="Comentar" className="hover:text-gray-600 transition-colors">
+          <button
+            onClick={handleToggleComments}
+            aria-label="Comentar"
+            className={`transition-colors cursor-pointer ${showComments ? 'text-crimson-600' : 'hover:text-gray-600'}`}
+          >
             <MessageCircle className="w-6 h-6 stroke-[1.8]" />
           </button>
-          <button aria-label="Compartilhar" className="hover:text-gray-600 transition-colors">
+          <button
+            aria-label="Compartilhar"
+            onClick={() => {
+              const url = `https://connectabrasil.vercel.app/feed`;
+              if (navigator.share) {
+                void navigator.share({
+                  title: `Zeladoria ${post.bairro} - ConectaBr`,
+                  text: post.descricao,
+                  url,
+                }).catch(() => {});
+              } else {
+                void navigator.clipboard.writeText(`${post.descricao}\n${url}`);
+                alert('Link copiado para compartilhar!');
+              }
+            }}
+            className="hover:text-gray-600 transition-colors cursor-pointer"
+          >
             <Send className="w-5 h-5 -rotate-45 stroke-[1.8]" />
           </button>
         </div>
@@ -235,13 +352,68 @@ export const PostComunidadeCard: React.FC<PostComunidadeCardProps> = ({ post }) 
         <div className="flex items-center space-x-3 pt-1 text-xs text-gray-500 font-medium">
           <div className="flex items-center space-x-1">
             <Heart className="w-3.5 h-3.5 stroke-[2] fill-transparent" />
-            <span>{post.curtidas + (liked ? 1 : 0)} curtidas</span>
+            <span>{likesCount} curtidas</span>
           </div>
-          <div className="flex items-center space-x-1">
+          <button
+            type="button"
+            onClick={handleToggleComments}
+            className="flex items-center space-x-1 hover:text-crimson-600 transition-colors cursor-pointer"
+          >
             <MessageCircle className="w-3.5 h-3.5 stroke-[2]" />
-            <span>0 comentários</span>
-          </div>
+            <span>{commentsCount} comentários</span>
+          </button>
         </div>
+
+        {/* Gaveta de Comentários Reais */}
+        {showComments && (
+          <div className="mt-2 pt-2.5 border-t border-gray-100 space-y-2.5 animate-fadeIn">
+            {loadingComments ? (
+              <p className="text-[11px] text-gray-400">Carregando comentários...</p>
+            ) : comments.length === 0 ? (
+              <p className="text-[11px] text-gray-400">Seja o primeiro morador a comentar esta ocorrência.</p>
+            ) : (
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                {comments.map((c) => (
+                  <div key={c.id} className="bg-gray-50 rounded-xl p-2 text-xs flex items-start justify-between gap-2">
+                    <div className="space-y-0.5">
+                      <span className="font-bold text-gray-900">
+                        {c.user?.nome_completo || 'Morador'}
+                      </span>
+                      <p className="text-gray-700 leading-snug">{c.conteudo}</p>
+                    </div>
+                    {currentUser?.id === c.user_id && (
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteComment(c.id)}
+                        className="text-gray-400 hover:text-red-600 p-0.5 shrink-0"
+                        title="Excluir comentário"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmitComment} className="flex items-center gap-2">
+              <input
+                type="text"
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                placeholder={currentUser ? 'Escreva um comentário...' : 'Entre para comentar'}
+                className="flex-1 px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-full text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-crimson-600 focus:bg-white"
+              />
+              <button
+                type="submit"
+                disabled={submittingComment || !newComment.trim()}
+                className="px-3 py-1.5 bg-crimson-600 hover:bg-crimson-700 disabled:opacity-40 text-white rounded-full text-xs font-bold cursor-pointer"
+              >
+                Enviar
+              </button>
+            </form>
+          </div>
+        )}
       </div>
     </article>
   );

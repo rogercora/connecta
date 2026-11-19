@@ -74,7 +74,7 @@ export async function middleware(request: NextRequest) {
       .eq('id', user.id)
       .maybeSingle();
 
-    if (profile?.role !== 'admin') {
+    if (profile?.role !== 'admin' && profile?.role !== 'super_admin') {
       return NextResponse.redirect(new URL('/feed', request.url));
     }
   }

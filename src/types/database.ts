@@ -9,7 +9,7 @@ export type NivelVerificacao = 0 | 1 | 2;
 
 export type OpcaoVoto = 'concordar' | 'discordar';
 
-export type StatusPauta = 'ativa' | 'encerrada' | 'peticao_gerada';
+export type StatusPauta = 'pendente_revisao' | 'ativa' | 'encerrada' | 'peticao_gerada';
 
 export type CategoriaComunidade =
   | 'buraco'
@@ -22,9 +22,32 @@ export type CategoriaComunidade =
   | 'educacao'
   | 'outro';
 
-export type StatusPeticao = 'rascunho' | 'aberta' | 'entregue' | 'respondida';
+export type StatusPeticao =
+  | 'rascunho'
+  | 'pendente_revisao'
+  | 'aberta'
+  | 'entregue'
+  | 'respondida'
+  | 'arquivada';
 
-export type UserRole = 'cidadao' | 'admin';
+export type TipoPeticao = 'oposicao_ato' | 'comunitaria';
+
+export type StatusCidade = 'ativa' | 'em_espera' | 'em_breve';
+
+export interface CidadeConfig {
+  id: string;
+  codigo_ibge: string | null;
+  nome: string;
+  estado: string;
+  status: StatusCidade;
+  meta_usuarios: number;
+  quorum_peticao: number;
+  email_camara_padrao: string | null;
+  email_ouvidoria_padrao: string | null;
+  created_at: string;
+}
+
+export type UserRole = 'cidadao' | 'admin' | 'super_admin';
 
 export interface User {
   id: string;
@@ -58,6 +81,9 @@ export interface PautaIA {
   fonte_diario: string | null;
   votos_concordar: number;
   votos_discordar: number;
+  quorum_meta?: number | null;
+  categoria?: string | null;
+  edicao_diario?: string | null;
   status: StatusPauta;
   data_votacao: string | null;
   created_at: string;
@@ -71,11 +97,15 @@ export interface PostComunidade {
   descricao: string;
   cep: string;
   bairro: string;
+  cidade?: string;
+  estado?: string;
   categoria: CategoriaComunidade;
   numero_protocolo: string;
   curtidas: number;
   moradores_afetados?: number;
+  comentarios_count?: number;
   user_ja_apoiou?: boolean;
+  user_ja_curtiu?: boolean;
   created_at: string;
 }
 
@@ -99,12 +129,38 @@ export interface Comentario {
 
 export interface Peticao {
   id: string;
-  pauta_id: string;
-  pauta?: PautaIA;
+  pauta_id: string | null;
+  pauta?: PautaIA | null;
+  tipo: TipoPeticao;
+  titulo: string | null;
+  resumo: string | null;
+  minuta_texto: string | null;
+  argumentos_moradores: string[];
+  email_destino: string | null;
+  vereador_alvo: string | null;
+  bairro: string | null;
+  cidade: string;
+  estado: string;
   cep_alvo: string;
+  meta_assinaturas: number;
   total_assinaturas: number;
   pdf_url: string | null;
+  protocolo_digital: string | null;
+  created_by?: string | null;
+  aprovada_por?: string | null;
+  aprovada_em?: string | null;
+  enviada_em?: string | null;
+  resposta_camara?: string | null;
+  user_assinou?: boolean;
   status: StatusPeticao;
+  created_at: string;
+}
+
+export interface AssinaturaPeticao {
+  id: string;
+  peticao_id: string;
+  user_id: string;
+  comentario: string | null;
   created_at: string;
 }
 

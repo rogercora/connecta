@@ -57,9 +57,11 @@ export const INITIAL_POSTS: PostComunidade[] = [
 
 interface FeedStore {
   activeTab: FeedLevel;
+  searchQuery: string;
   pautas: PautaIA[];
   posts: PostComunidade[];
   setActiveTab: (tab: FeedLevel) => void;
+  setSearchQuery: (q: string) => void;
   votarPauta: (pautaId: string, opcao: 'concordar' | 'discordar') => void;
   curtirPost: (postId: string) => void;
   toggleApoiarPost: (postId: string) => void;
@@ -68,9 +70,11 @@ interface FeedStore {
 
 export const useFeedStore = create<FeedStore>((set) => ({
   activeTab: 'bairro',
+  searchQuery: '',
   pautas: [INITIAL_PAUTA],
   posts: INITIAL_POSTS,
   setActiveTab: (tab) => set({ activeTab: tab }),
+  setSearchQuery: (searchQuery) => set({ searchQuery }),
   votarPauta: (pautaId, opcao) => {
     set((state) => ({
       pautas: state.pautas.map((p) => {

@@ -12,6 +12,7 @@ export interface CidadeStatusData {
   is_liberada: boolean;
   total_cadastrados: number;
   meta_usuarios: number;
+  quorum_peticao?: number;
   faltam: number;
   porcentagem: number;
 }
@@ -27,12 +28,12 @@ export const CidadeEsperaView: React.FC<CidadeEsperaViewProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
 
-  const shareText = `Vizinhos de ${cidadeStatus.cidade}! O ConectaBr está prestes a ser liberado na nossa cidade para acompanharmos pautas da Câmara com IA e cobrarmos zeladoria urbana com protocolo. Faltam poucas pessoas para bater a meta! Cadastre-se pelo link para liberar: https://connecta-swart-pi.vercel.app/cadastro`;
+  const shareText = `Vizinhos de ${cidadeStatus.cidade}! O ConectaBr está prestes a ser liberado na nossa cidade para acompanharmos pautas da Câmara com IA e cobrarmos zeladoria urbana com protocolo. Faltam poucas pessoas para bater a meta! Cadastre-se pelo link para liberar: https://connectabrasil.vercel.app/cadastro`;
 
   const shareUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
 
   const handleCopyLink = () => {
-    navigator.clipboard.writeText('https://connecta-swart-pi.vercel.app/cadastro');
+    navigator.clipboard.writeText('https://connectabrasil.vercel.app/cadastro');
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };

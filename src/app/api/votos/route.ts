@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { resolveCidadeQuorumConfig } from '@/lib/quorum';
+import { gerarMinutaPeticaoComIA } from '@/lib/ia/peticaoGenerator';
 import { requireAuthUser } from '@/lib/auth/serverAuth';
 import { getSupabaseAdmin } from '@/lib/supabase/server';
 
@@ -108,9 +110,92 @@ export async function POST(req: Request) {
     // Lê os contadores atualizados atomicamente pelo trigger do PostgreSQL
     const { data: pautaAtualizada } = await supabaseAdmin
       .from('pautas_ia')
-      .select('votos_concordar, votos_discordar')
+      .select('*')
       .eq('id', pauta_id)
       .maybeSingle();
+
+    let peticaoGeradaInfo: { id: string; status: string; titulo: string | null } | null = null;
+
+    if (pautaAtualizada) {
+      try {
+        const cidadeCfg = await resolveCidadeQuorumConfig(
+          supabaseAdmin,
+          pautaAtualizada.cidade_alvo,
+          pautaAtualizada.estado_alvo
+        );
+        const quorumEfetivo = Number(pautaAtualizada.quorum_meta) || cidadeCfg.quorum_peticao || 50;
+
+        if ((pautaAtualizada.votos_discordar ?? 0) >= quorumEfetivo) {
+          await supabaseAdmin.rpc('check_peticao_threshold', {
+            pauta_uuid: pauta_id,
+            threshold: quorumEfetivo,
+          });
+
+          const { data: peticaoExistente } = await supabaseAdmin
+            .from('peticoes')
+            .select('id, status, titulo, minuta_texto')
+            .eq('pauta_id', pauta_id)
+            .maybeSingle();
+
+          if (peticaoExistente) {
+            if (!peticaoExistente.minuta_texto) {
+              const { data: motivosRows } = await supabaseAdmin
+                .from('votos_pauta')
+                .select('motivo_discordancia')
+                .eq('pauta_id', pauta_id)
+                .eq('opcao_voto', 'discordar')
+                .not('motivo_discordancia', 'is', null)
+                .order('created_at', { ascending: false })
+                .limit(30);
+
+              const motivosReais = (motivosRows ?? [])
+                .map((r: any) => r.motivo_discordancia)
+                .filter(Boolean);
+
+              const minuta = await gerarMinutaPeticaoComIA({
+                tituloPauta: pautaAtualizada.titulo,
+                resumoPauta: pautaAtualizada.resumo_ia,
+                impactoBairro: pautaAtualizada.impacto_bairro,
+                vereadorAlvo: pautaAtualizada.vereador_proponente,
+                bairro: pautaAtualizada.bairro_alvo,
+                cidade: pautaAtualizada.cidade_alvo,
+                estado: pautaAtualizada.estado_alvo,
+                totalDiscordancias: pautaAtualizada.votos_discordar ?? quorumEfetivo,
+                quorumMeta: quorumEfetivo,
+                motivosReais,
+              });
+
+              await supabaseAdmin
+                .from('peticoes')
+                .update({
+                  titulo: minuta.tituloPeticao,
+                  resumo: minuta.resumoExecutivo,
+                  minuta_texto: minuta.minutaTexto,
+                  argumentos_moradores: minuta.argumentosSintetizados,
+                  email_destino: cidadeCfg.email_camara_padrao || cidadeCfg.email_ouvidoria_padrao,
+                  meta_assinaturas: quorumEfetivo,
+                })
+                .eq('id', peticaoExistente.id)
+                .is('minuta_texto', null);
+
+              peticaoGeradaInfo = {
+                id: peticaoExistente.id,
+                status: peticaoExistente.status,
+                titulo: minuta.tituloPeticao,
+              };
+            } else {
+              peticaoGeradaInfo = {
+                id: peticaoExistente.id,
+                status: peticaoExistente.status,
+                titulo: peticaoExistente.titulo,
+              };
+            }
+          }
+        }
+      } catch (quorumErr: any) {
+        console.warn('Aviso ao verificar quórum/gerar minuta de petição:', quorumErr?.message);
+      }
+    }
 
     return NextResponse.json({
       success: true,
@@ -126,6 +211,7 @@ export async function POST(req: Request) {
         votos_concordar: pautaAtualizada?.votos_concordar ?? pautaExistente.votos_concordar ?? 0,
         votos_discordar: pautaAtualizada?.votos_discordar ?? pautaExistente.votos_discordar ?? 0,
       },
+      peticao_gerada: peticaoGeradaInfo,
       db_persisted: true,
     });
   } catch (error: any) {

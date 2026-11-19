@@ -19,6 +19,7 @@ import { useVoto } from '@/hooks/useVoto';
 
 interface PautaIACardProps {
   pauta: PautaIA;
+  cidadeQuorum?: number;
 }
 
 function getSafeHref(url: string | null): string | null {
@@ -34,7 +35,7 @@ function getSafeHref(url: string | null): string | null {
   }
 }
 
-export const PautaIACard: React.FC<PautaIACardProps> = ({ pauta }) => {
+export const PautaIACard: React.FC<PautaIACardProps> = ({ pauta, cidadeQuorum }) => {
   const [modalOpen, setModalOpen] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
 
@@ -59,9 +60,10 @@ export const PautaIACard: React.FC<PautaIACardProps> = ({ pauta }) => {
     void submitVote('discordar', motivo);
   };
 
+  const metaQuorum = pauta.quorum_meta ?? cidadeQuorum ?? 50;
   const pctConcordar = totalVotos > 0 ? Math.round((concordarCount / totalVotos) * 100) : 50;
   const pctDiscordar = totalVotos > 0 ? 100 - pctConcordar : 50;
-  const atingiuQuorum = discordarCount >= 50 || concordarCount >= 50;
+  const atingiuQuorum = discordarCount >= metaQuorum || pauta.status === 'peticao_gerada';
   const safePdfUrl = getSafeHref(pauta.link_pdf_original);
 
   return (
@@ -156,7 +158,7 @@ export const PautaIACard: React.FC<PautaIACardProps> = ({ pauta }) => {
 
         {/* Legenda de Consenso */}
         <p className="text-[10.5px] text-zinc-500 text-center mb-3 font-medium">
-          Concordar registra aprovação do governo. Discordar soma assinatura para abrir abaixo-assinado com 50 votos.
+          Concordar registra apoio à pauta. Discordar soma adesão para gerar petição oficial ao atingir {metaQuorum} votos.
         </p>
 
         {/* Placar Cívico em Tempo Real */}
@@ -189,23 +191,25 @@ export const PautaIACard: React.FC<PautaIACardProps> = ({ pauta }) => {
 
             <div className="flex justify-between text-[11px] font-semibold">
               <span className="text-crimson-700">{pctConcordar}% concordam ({concordarCount})</span>
-              <span className="text-zinc-800">{pctDiscordar}% discordam ({discordarCount}/50)</span>
+              <span className="text-zinc-800">{pctDiscordar}% discordam ({discordarCount}/{metaQuorum})</span>
             </div>
 
             {atingiuQuorum ? (
               <div className="mt-1 pt-2 border-t border-zinc-200 text-[11px] font-bold text-crimson-800 space-y-1">
                 <div className="flex items-center justify-between">
-                  <span>🚨 Quórum atingido (+50 discordâncias)!</span>
-                  <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px]">Em revisão no Admin</span>
+                  <span>🚨 Quórum atingido ({metaQuorum}+ discordâncias)!</span>
+                  <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px]">
+                    {pauta.status === 'peticao_gerada' ? 'Petição criada' : 'Em revisão no Admin'}
+                  </span>
                 </div>
                 <p className="text-[10px] text-zinc-500 font-normal">
-                  A IA gerou a minuta formal a partir dos argumentos dos moradores. Assim que aprovada pelo administrador, será enviada ao responsável e publicada na aba de Petições.
+                  A IA gerou a minuta formal a partir dos argumentos dos moradores. Assim que aprovada pelo administrador, será publicada na aba de Petições para protocolo oficial.
                 </p>
               </div>
             ) : (
               <div className="mt-1 pt-1.5 border-t border-zinc-200 text-[10.5px] text-zinc-500 flex justify-between">
-                <span>Faltam {Math.max(0, 50 - discordarCount)} discordâncias para virar petição oficial</span>
-                <span className="font-semibold text-zinc-700">Meta: 50</span>
+                <span>Faltam {Math.max(0, metaQuorum - discordarCount)} discordâncias para virar petição oficial</span>
+                <span className="font-semibold text-zinc-700">Meta: {metaQuorum}</span>
               </div>
             )}
           </div>

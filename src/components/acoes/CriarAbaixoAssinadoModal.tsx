@@ -1,159 +1,222 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Megaphone, MapPin, Users, CheckCircle2 } from 'lucide-react';
+import Link from 'next/link';
+import { X, FileSignature, AlertCircle, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import { useAuthStore } from '@/stores/authStore';
+import { Peticao } from '@/types/database';
 
 interface CriarAbaixoAssinadoModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreated: (novaCausa: {
-    titulo: string;
-    bairro: string;
-    cidade: string;
-    estado: string;
-    meta: number;
-    resumo: string;
-  }) => void;
+  onCreated: (peticao: Peticao) => void;
+  quorumCidade?: number;
 }
 
 export const CriarAbaixoAssinadoModal: React.FC<CriarAbaixoAssinadoModalProps> = ({
   isOpen,
   onClose,
   onCreated,
+  quorumCidade = 50,
 }) => {
-  const user = useAuthStore((s) => s.user);
+  const { user, isAuthenticated } = useAuthStore();
 
   const [titulo, setTitulo] = useState('');
   const [bairro, setBairro] = useState(user?.bairro || 'Jardim Aquárius');
-  const [cidade, setCidade] = useState(user?.cidade || 'São José dos Campos');
-  const [meta, setMeta] = useState('100');
+  const [vereadorAlvo, setVereadorAlvo] = useState('Câmara Municipal / Vereadores');
   const [resumo, setResumo] = useState('');
+  const [argumentoExtra, setArgumentoExtra] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const cidade = user?.cidade || 'São José dos Campos';
+  const estado = user?.estado || 'SP';
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!titulo.trim() || !resumo.trim()) return;
+    setErrorMsg(null);
+
+    if (!isAuthenticated) {
+      setErrorMsg('Você precisa entrar na sua conta para propor uma petição oficial.');
+      return;
+    }
+
+    if (titulo.trim().length < 6 || resumo.trim().length < 15) {
+      setErrorMsg('Preencha um título (mín. 6 caracteres) e o resumo do pedido (mín. 15 caracteres).');
+      return;
+    }
 
     setLoading(true);
-    setTimeout(() => {
-      onCreated({
-        titulo: titulo.trim(),
-        bairro: bairro.trim(),
-        cidade: cidade.trim(),
-        estado: user?.estado || 'SP',
-        meta: parseInt(meta) || 100,
-        resumo: resumo.trim(),
+    try {
+      const argumentos = argumentoExtra
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+      const res = await fetch('/api/peticoes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          titulo: titulo.trim(),
+          resumo: resumo.trim(),
+          bairro: bairro.trim() || user?.bairro || 'Centro',
+          vereador_alvo: vereadorAlvo.trim() || 'Câmara Municipal',
+          argumentos,
+        }),
       });
-      setLoading(false);
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErrorMsg(data.error || 'Não foi possível criar sua petição.');
+        return;
+      }
+
+      if (data.peticao) {
+        onCreated(data.peticao as Peticao);
+      }
+
+      setTitulo('');
+      setResumo('');
+      setArgumentoExtra('');
       onClose();
-    }, 400);
+    } catch {
+      setErrorMsg('Erro de rede ao salvar petição no servidor.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
-      <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden border border-zinc-200">
-        {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-zinc-200 flex items-center justify-between bg-zinc-50/80">
-          <div className="flex items-center space-x-2.5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
+      <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden border border-zinc-200 max-h-[90vh] flex flex-col">
+        <div className="p-4 border-b border-zinc-100 flex items-center justify-between bg-zinc-50/70 shrink-0">
+          <div className="flex items-center space-x-2">
             <div className="w-8 h-8 rounded-xl bg-crimson-50 text-crimson-600 flex items-center justify-center border border-crimson-200">
-              <Megaphone className="w-4 h-4 stroke-[2.2]" />
+              <FileSignature className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="font-extrabold text-sm sm:text-base text-zinc-950 leading-tight">
-                Criar Novo Abaixo-Assinado
+              <h3 className="text-sm font-black text-zinc-950 leading-tight">
+                Propor Petição Comunitária
               </h3>
-              <p className="text-[11px] text-zinc-500">
-                Inicie uma mobilização coletiva auditada para o seu bairro
+              <p className="text-[10px] text-zinc-500 font-semibold">
+                {cidade}/{estado} • Meta da cidade: {quorumCidade} assinaturas
               </p>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            aria-label="Fechar"
-            className="p-1.5 text-zinc-400 hover:text-zinc-700 rounded-full hover:bg-zinc-200/60 transition-colors"
+            className="text-zinc-400 hover:text-zinc-700 p-1 rounded-full hover:bg-zinc-100"
+            aria-label="Fechar modal"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4">
-          <Input
-            label="Título da Causa ou Reivindicação"
-            placeholder="Ex: Reforma e Iluminação na Praça do Bairro"
-            value={titulo}
-            onChange={(e) => setTitulo(e.target.value)}
-            required
-          />
+        <form onSubmit={handleSubmit} className="p-4 space-y-3.5 overflow-y-auto text-xs">
+          {!isAuthenticated && (
+            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 flex items-center justify-between gap-2">
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
+                <span>Entre com sua conta para assinar e enviar sua proposta.</span>
+              </div>
+              <Link href="/login?next=/acoes" className="font-bold text-crimson-700 underline shrink-0">
+                Entrar
+              </Link>
+            </div>
+          )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <Input
-              label="Bairro"
-              placeholder="Ex: Jardim Aquárius"
-              value={bairro}
-              onChange={(e) => setBairro(e.target.value)}
+          {errorMsg && (
+            <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-800 font-medium">
+              {errorMsg}
+            </div>
+          )}
+
+          <div className="p-2.5 rounded-xl bg-crimson-50/70 border border-crimson-200/80 text-[11px] text-crimson-950 flex items-start space-x-2">
+            <Sparkles className="w-4 h-4 text-crimson-600 shrink-0 mt-0.5" />
+            <span>
+              Amparado pelo <strong>Art. 5º, XXXIV, &ldquo;a&rdquo; da CF/88</strong>. Sua causa entra com 1 assinatura sua e passa por validação rápida no Admin antes de abrir coleta pública.
+            </span>
+          </div>
+
+          <div>
+            <label className="font-bold text-zinc-800 block mb-1">Título da Causa *</label>
+            <input
+              type="text"
               required
+              placeholder="Ex: Instalação de semáforo na Av. Shishima Hifumi"
+              value={titulo}
+              onChange={(e) => setTitulo(e.target.value)}
+              className="w-full p-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 focus:ring-2 focus:ring-crimson-600 focus:outline-none"
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2.5">
             <div>
-              <label className="text-xs font-bold text-gray-700 mb-1.5 block">
-                Meta de Assinaturas
-              </label>
-              <select
-                value={meta}
-                onChange={(e) => setMeta(e.target.value)}
-                className="w-full p-3 border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-crimson-600 focus:outline-none bg-white"
-              >
-                <option value="50">50 moradores (Pequeno porte)</option>
-                <option value="100">100 moradores (Recomendado)</option>
-                <option value="250">250 moradores (Bairro amplo)</option>
-                <option value="500">500 moradores (Cidade inteira)</option>
-              </select>
+              <label className="font-bold text-zinc-800 block mb-1">Bairro Principal *</label>
+              <input
+                type="text"
+                required
+                value={bairro}
+                onChange={(e) => setBairro(e.target.value)}
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 focus:ring-2 focus:ring-crimson-600 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="font-bold text-zinc-800 block mb-1">Destinatário Público</label>
+              <input
+                type="text"
+                value={vereadorAlvo}
+                onChange={(e) => setVereadorAlvo(e.target.value)}
+                className="w-full p-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 focus:ring-2 focus:ring-crimson-600 focus:outline-none"
+              />
             </div>
           </div>
 
           <div>
-            <label className="text-xs font-bold text-gray-700 mb-1.5 block">
-              Descrição e justificativa do pedido:
-            </label>
+            <label className="font-bold text-zinc-800 block mb-1">O que está sendo solicitado? *</label>
             <textarea
-              required
               rows={3}
+              required
+              placeholder="Explique o problema local e o que os moradores pedem à Câmara ou Prefeitura..."
               value={resumo}
               onChange={(e) => setResumo(e.target.value)}
-              placeholder="Explique o que precisa ser feito e por que afeta a qualidade de vida dos moradores..."
-              className="w-full p-3 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-crimson-600 focus:outline-none resize-none leading-relaxed"
+              className="w-full p-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 focus:ring-2 focus:ring-crimson-600 focus:outline-none leading-relaxed"
             />
           </div>
 
-          <div className="p-3 bg-zinc-50 rounded-xl text-[11px] text-zinc-600 border border-zinc-200 space-y-1">
-            <p className="font-bold text-zinc-800">🛡️ Validação Automática:</p>
-            <p>
-              Ao atingir a meta escolhida, o sistema gera a certidão em PDF com quórum verificado pronta para entrega protocolada aos vereadores.
-            </p>
+          <div>
+            <label className="font-bold text-zinc-800 block mb-1">
+              Argumentos / Fatos de Apoio (1 por linha, opcional)
+            </label>
+            <textarea
+              rows={2}
+              placeholder="Ex: Risco diário em frente à escola estadual&#10;Protocolo anterior sem retorno há 60 dias"
+              value={argumentoExtra}
+              onChange={(e) => setArgumentoExtra(e.target.value)}
+              className="w-full p-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-900 focus:ring-2 focus:ring-crimson-600 focus:outline-none leading-relaxed"
+            />
           </div>
 
-          <div className="flex space-x-2 pt-2">
-            <Button
+          <div className="pt-1 flex justify-end space-x-2">
+            <button
               type="button"
-              variant="outline"
               onClick={onClose}
-              className="flex-1 rounded-xl text-xs font-semibold py-2.5"
+              className="py-2.5 px-4 rounded-xl border border-zinc-200 text-zinc-700 font-bold hover:bg-zinc-50"
             >
               Cancelar
-            </Button>
+            </button>
             <Button
               type="submit"
               variant="primary"
               isLoading={loading}
-              className="flex-1 rounded-xl text-xs font-bold py-2.5 bg-crimson-600 hover:bg-crimson-700 text-white shadow-crimson-btn"
+              disabled={!isAuthenticated}
+              className="py-2.5 px-5 rounded-xl bg-crimson-600 hover:bg-crimson-700 text-white font-bold shadow-crimson-btn"
             >
-              Publicar Abaixo-Assinado
+              Enviar Petição
             </Button>
           </div>
         </form>
@@ -161,4 +224,3 @@ export const CriarAbaixoAssinadoModal: React.FC<CriarAbaixoAssinadoModalProps> =
     </div>
   );
 };
-

@@ -8,6 +8,7 @@ import { PostComunidadeCard } from './PostComunidadeCard';
 import { CidadeEsperaView } from './CidadeEsperaView';
 import { usePosts, useCidadeStatus } from '@/hooks/useFeedReal';
 import { useAuthStore } from '@/stores/authStore';
+import { useFeedStore } from '@/stores/feedStore';
 
 interface FeedListProps {
   feedLevel: FeedLevel;
@@ -16,6 +17,8 @@ interface FeedListProps {
 
 export const FeedList: React.FC<FeedListProps> = ({ feedLevel, onSwitchTab }) => {
   const user = useAuthStore((s) => s.user);
+  const searchQuery = useFeedStore((s) => s.searchQuery);
+  const setSearchQuery = useFeedStore((s) => s.setSearchQuery);
   const userCidade = user?.cidade || 'São José dos Campos';
   const userEstado = user?.estado || 'SP';
   const userBairro = user?.bairro || 'Jardim Aquárius';
@@ -81,10 +84,32 @@ export const FeedList: React.FC<FeedListProps> = ({ feedLevel, onSwitchTab }) =>
         </Link>
       </div>
 
+      {searchQuery.trim() && (
+        <div className="px-4 py-2 bg-amber-50 border-b border-amber-200 flex items-center justify-between text-xs text-amber-950">
+          <span>
+            Filtrando por: <strong>&ldquo;{searchQuery}&rdquo;</strong>
+          </span>
+          <button
+            type="button"
+            onClick={() => setSearchQuery('')}
+            className="font-bold text-crimson-700 hover:underline"
+          >
+            Limpar
+          </button>
+        </div>
+      )}
+
       {/* Posts da Comunidade de Moradores */}
-      {posts.map((post) => (
-        <PostComunidadeCard key={post.id} post={post} />
-      ))}
+      {posts
+        .filter((post) => {
+          const q = searchQuery.trim().toLowerCase();
+          if (!q) return true;
+          const hay = `${post.descricao || ''} ${post.bairro || ''} ${post.categoria || ''} ${post.numero_protocolo || ''} ${post.user?.nome_completo || ''}`.toLowerCase();
+          return hay.includes(q);
+        })
+        .map((post) => (
+          <PostComunidadeCard key={post.id} post={post} />
+        ))}
 
       {posts.length === 0 && (
         <div className="p-8 text-center space-y-4">

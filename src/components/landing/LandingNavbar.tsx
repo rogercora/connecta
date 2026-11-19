@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Menu, X, MapPin, Sparkles, Megaphone } from 'lucide-react';
+import { Menu, X, MapPin, Sparkles, Megaphone, LogIn } from 'lucide-react';
+import { useAuthStore } from '@/stores/authStore';
 
 interface LandingNavbarProps {
   onFocusCep: () => void;
@@ -116,7 +117,8 @@ export const LandingNavbar: React.FC<LandingNavbarProps> = ({ onFocusCep, onOpen
         </div>
 
         {/* Botão de ação à direita */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
+          <LandingAuthLink />
           <button
             type="button"
             onClick={handleCep}
@@ -165,17 +167,40 @@ export const LandingNavbar: React.FC<LandingNavbarProps> = ({ onFocusCep, onOpen
                 {link.label}
               </a>
             ))}
-            <button
-              type="button"
-              onClick={handleCep}
-              className="mt-2 inline-flex items-center justify-center gap-2 rounded-full bg-crimson-600 px-5 py-3.5 text-sm font-bold text-white shadow-crimson-btn hover:bg-crimson-700 cursor-pointer"
-            >
-              <MapPin className="h-4 w-4" />
-              Verificar meu CEP
-            </button>
+            <div className="flex flex-col gap-2 pt-2">
+              <LandingAuthLink mobile />
+              <button
+                type="button"
+                onClick={handleCep}
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-crimson-600 px-5 py-3.5 text-sm font-bold text-white shadow-crimson-btn hover:bg-crimson-700 cursor-pointer"
+              >
+                <MapPin className="h-4 w-4" />
+                Verificar meu CEP
+              </button>
+            </div>
           </div>
         </div>
       )}
     </nav>
   );
 };
+
+function LandingAuthLink({ mobile = false }: { mobile?: boolean }) {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const href = isAuthenticated ? '/feed' : '/login';
+  const label = isAuthenticated ? 'Abrir App' : 'Entrar';
+
+  return (
+    <Link
+      href={href}
+      className={
+        mobile
+          ? 'inline-flex items-center justify-center gap-2 rounded-full border border-zinc-300 bg-white px-5 py-3 text-sm font-bold text-zinc-900 hover:bg-zinc-50'
+          : 'inline-flex items-center gap-1.5 rounded-full border border-zinc-300 bg-white px-4 py-2 text-xs sm:text-sm font-bold text-zinc-800 hover:bg-zinc-50 transition-colors'
+      }
+    >
+      <LogIn className="h-4 w-4 text-crimson-600" />
+      <span>{label}</span>
+    </Link>
+  );
+}

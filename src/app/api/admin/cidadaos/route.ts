@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireAdminUser } from '@/lib/auth/serverAuth';
+import { requireAdminUser, requireSuperAdminUser } from '@/lib/auth/serverAuth';
 import { getSupabaseAdmin } from '@/lib/supabase/server';
 import { formatCEP } from '@/lib/utils/formatters';
 
@@ -15,6 +15,7 @@ export async function GET() {
       geminiConfigured: Boolean((process.env.GEMINI_API_KEY || '').trim()),
       cronSecretConfigured: Boolean((process.env.CRON_SECRET || '').trim()),
       serviceRoleConfigured: Boolean((process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim()),
+      resendConfigured: Boolean((process.env.RESEND_API_KEY || '').trim()),
     };
 
     try {
@@ -30,6 +31,7 @@ export async function GET() {
         return NextResponse.json({
           cidadaos: [],
           currentAdminId: auth.authUser.id,
+          currentUserRole: auth.profile?.role ?? 'admin',
           adminDbError: `Erro no Supabase ao consultar cidadãos: ${error.message}`,
           serverConfig,
         });
@@ -38,6 +40,7 @@ export async function GET() {
       return NextResponse.json({
         cidadaos: data ?? [],
         currentAdminId: auth.authUser.id,
+        currentUserRole: auth.profile?.role ?? 'admin',
         adminDbError: null,
         serverConfig,
       });
@@ -46,6 +49,7 @@ export async function GET() {
       return NextResponse.json({
         cidadaos: [],
         currentAdminId: auth.authUser.id,
+        currentUserRole: auth.profile?.role ?? 'admin',
         adminDbError: adminErr?.message || 'Falha na configuração de SUPABASE_SERVICE_ROLE_KEY.',
         serverConfig,
       });
@@ -56,10 +60,10 @@ export async function GET() {
   }
 }
 
-// POST: Cria diretamente um novo Administrador (ou usuário pré-confirmado) com nome completo
+// POST: Cria diretamente um novo Administrador (exclusivo Super Admin)
 export async function POST(req: Request) {
   try {
-    const auth = await requireAdminUser();
+    const auth = await requireSuperAdminUser();
     if (!auth.ok) return auth.response;
 
     const body = await req.json();
@@ -182,15 +186,21 @@ export async function PATCH(req: Request) {
     }
 
     if (role !== undefined) {
+      if (auth.profile?.role !== 'super_admin') {
+        return NextResponse.json(
+          { error: 'Apenas o Super Admin pode promover ou rebaixar administradores.' },
+          { status: 403 }
+        );
+      }
       if (role !== 'cidadao' && role !== 'admin') {
         return NextResponse.json(
           { error: 'Papel inválido. Utilize cidadao ou admin.' },
           { status: 400 }
         );
       }
-      if (role === 'cidadao' && user_id === auth.authUser.id) {
+      if (user_id === auth.authUser.id) {
         return NextResponse.json(
-          { error: 'Você não pode remover o próprio privilégio de administrador.' },
+          { error: 'Você não pode alterar o próprio papel de Super Admin pelo painel.' },
           { status: 400 }
         );
       }
@@ -205,6 +215,22 @@ export async function PATCH(req: Request) {
     }
 
     const supabaseAdmin = getSupabaseAdmin();
+
+    if (role !== undefined) {
+      const { data: targetUser } = await supabaseAdmin
+        .from('users')
+        .select('role')
+        .eq('id', user_id)
+        .maybeSingle();
+
+      if (targetUser?.role === 'super_admin') {
+        return NextResponse.json(
+          { error: 'Não é permitido alterar o papel de um Super Admin.' },
+          { status: 403 }
+        );
+      }
+    }
+
     const { data, error } = await supabaseAdmin
       .from('users')
       .update(updates)

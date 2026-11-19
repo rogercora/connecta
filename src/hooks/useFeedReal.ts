@@ -48,7 +48,7 @@ export function usePautas(
       let query = supabase
         .from('pautas_ia')
         .select('*')
-        .eq('status', 'ativa')
+        .in('status', ['ativa', 'peticao_gerada'])
         .order('created_at', { ascending: false });
 
       if (feedLevel === 'bairro') {
@@ -78,38 +78,81 @@ export function usePosts(feedLevel: FeedLevel, userCidade: string = 'São José 
   return useQuery({
     queryKey: ['posts', feedLevel, userCidade, userBairro],
     queryFn: async () => {
-      let query = supabase
-        .from('posts_comunidade')
-        .select(`
-          *,
-          user:perfis_publicos(nome_completo, avatar_url, bairro, cidade, estado, nivel_verificacao)
-        `)
-        .order('created_at', { ascending: false });
+      const selectFields = `
+        *,
+        user:perfis_publicos(nome_completo, avatar_url, bairro, cidade, estado, nivel_verificacao),
+        comentarios(count)
+      `;
 
-      if (feedLevel === 'bairro') {
-        query = query.ilike('bairro', `%${userBairro}%`);
-      }
-
-      const { data, error } = await query;
-      if (error) {
-        console.error('Erro ao buscar posts no Supabase:', error);
-        throw error;
-      }
-
-      // Fallback amigável se no bairro específico não tiver post ainda
-      if (feedLevel === 'bairro' && (!data || data.length === 0)) {
-        const { data: todosPosts } = await supabase
+      const runQuery = async (applyCity: boolean, applyBairro: boolean) => {
+        let q = supabase
           .from('posts_comunidade')
-          .select(`
-            *,
-            user:perfis_publicos(nome_completo, avatar_url, bairro, cidade, estado, nivel_verificacao)
-          `)
+          .select(selectFields)
           .order('created_at', { ascending: false });
 
-        return (todosPosts ?? []) as (PostComunidade & { user: any })[];
+        if (applyCity && userCidade && feedLevel !== 'federal') {
+          q = q.ilike('cidade', `%${userCidade}%`);
+        }
+        if (applyBairro && userBairro) {
+          q = q.ilike('bairro', `%${userBairro}%`);
+        }
+        return await q;
+      };
+
+      let result = await runQuery(feedLevel !== 'federal', feedLevel === 'bairro');
+      if (result.error && result.error.message?.includes('cidade')) {
+        // Fallback compatível caso migration Sprint 2 ainda não tenha rodado
+        let qFallback = supabase
+          .from('posts_comunidade')
+          .select(selectFields)
+          .order('created_at', { ascending: false });
+        if (feedLevel === 'bairro' && userBairro) {
+          qFallback = qFallback.ilike('bairro', `%${userBairro}%`);
+        }
+        result = await qFallback;
       }
 
-      return (data ?? []) as (PostComunidade & { user: any })[];
+      if (result.error) {
+        console.error('Erro ao buscar posts no Supabase:', result.error);
+        throw result.error;
+      }
+
+      let rawPosts = result.data ?? [];
+
+      // Fallback amigável se no bairro específico não houver ocorrência ainda (restringindo à cidade)
+      if (feedLevel === 'bairro' && rawPosts.length === 0) {
+        const cityOnly = await runQuery(true, false);
+        if (!cityOnly.error && cityOnly.data) {
+          rawPosts = cityOnly.data;
+        }
+      }
+
+      // Enriquecer com curtidas e apoios do usuário logado
+      const curtidosSet = new Set<string>();
+      const apoiadosSet = new Set<string>();
+      try {
+        const {
+          data: { user: authUser },
+        } = await supabase.auth.getUser();
+        if (authUser && rawPosts.length > 0) {
+          const ids = rawPosts.map((p: any) => p.id);
+          const [{ data: curtidasRows }, { data: apoiosRows }] = await Promise.all([
+            supabase.from('post_curtidas').select('post_id').eq('user_id', authUser.id).in('post_id', ids),
+            supabase.from('post_apoios').select('post_id').eq('user_id', authUser.id).in('post_id', ids),
+          ]);
+          for (const c of curtidasRows ?? []) curtidosSet.add(c.post_id);
+          for (const a of apoiosRows ?? []) apoiadosSet.add(a.post_id);
+        }
+      } catch {
+        // Ignora silenciosamente se não autenticado ou tabela em rollout
+      }
+
+      return rawPosts.map((p: any) => ({
+        ...p,
+        comentarios_count: Array.isArray(p.comentarios) ? Number(p.comentarios[0]?.count ?? 0) : 0,
+        user_ja_curtiu: curtidosSet.has(p.id),
+        user_ja_apoiou: apoiadosSet.has(p.id),
+      })) as (PostComunidade & { user: any })[];
     },
     retry: 1,
     staleTime: 1000 * 60,

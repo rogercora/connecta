@@ -186,6 +186,8 @@ export default function PostarPage() {
         p_bairro: bairroLimpo,
         p_categoria: categoria,
         p_protocolo: novoProtocolo,
+        p_cidade: user.cidade || 'São José dos Campos',
+        p_estado: user.estado || 'SP',
       });
 
       if (error || !data?.post_id) {

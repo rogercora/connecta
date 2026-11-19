@@ -35,7 +35,7 @@ export const MinutaModal: React.FC<MinutaModalProps> = ({ isOpen, onClose, data 
     window.print();
   };
 
-  const shareText = `Veja a minuta do Abaixo-Assinado Oficial dos moradores de ${data.cidade}: "${data.titulo}". Já conta com ${data.totalAssinaturas} assinaturas auditadas pelo ConectaBr. Apoie e acompanhe: https://connecta-swart-pi.vercel.app/acoes`;
+  const shareText = `Veja a minuta do Abaixo-Assinado Oficial dos moradores de ${data.cidade}: "${data.titulo}". Já conta com ${data.totalAssinaturas} assinaturas auditadas pelo ConectaBr. Apoie e acompanhe: https://connectabrasil.vercel.app/acoes`;
 
   const shareUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
 
@@ -113,7 +113,7 @@ export const MinutaModal: React.FC<MinutaModalProps> = ({ isOpen, onClose, data 
               I. DO DIREITO CONSTITUCIONAL DE PETIÇÃO
             </h4>
             <p className="text-justify text-zinc-700 leading-normal text-xs">
-              Os cidadãos abaixo identificados e auditados, no pleno gozo de seus direitos cívicos e com residência comprovada no Município de {data.cidade} ({data.estado}), com fundamento no <strong>Artigo 5º, inciso XXXIV, alínea &apos;a&apos; da Constituição da República Federativa do Brasil</strong>, vêm mui respeitosamente perante este Poder Legislativo Municipal apresentar a presente manifestação cívica.
+              Os cidadãos abaixo identificados e auditados, residentes e cadastrados com CEP validado no Município de {data.cidade} ({data.estado}), com fundamento no <strong>Artigo 5º, inciso XXXIV, alínea &apos;a&apos; da Constituição da República Federativa do Brasil</strong>, vêm mui respeitosamente perante este Poder Legislativo Municipal apresentar a presente manifestação cívica.
             </p>
           </div>
 
@@ -174,7 +174,7 @@ export const MinutaModal: React.FC<MinutaModalProps> = ({ isOpen, onClose, data 
             <div className="p-3 bg-zinc-100 rounded-xl text-[11px] text-zinc-600 border border-zinc-200 space-y-1">
               <p className="font-bold text-zinc-800">🔒 Certificação Digital ConectaBr:</p>
               <p>
-                Os signatários desta petição foram auditados por validação cadastral e georreferenciamento de CEP residencial. As chaves criptográficas de autenticidade estão arquivadas e disponíveis para conferência da comissão legislativa.
+                Os signatários desta petição participaram por meio de conta autenticada única vinculada a CEP validado na plataforma ConectaBr. O registro de adesões encontra-se auditável no protocolo oficial desta petição.
               </p>
             </div>
           </div>

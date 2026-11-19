@@ -56,11 +56,28 @@ export async function requireAdminUser(): Promise<AuthGuardResult> {
   const authResult = await requireAuthUser();
   if (!authResult.ok) return authResult;
 
-  if (authResult.profile?.role !== 'admin') {
+  if (authResult.profile?.role !== 'admin' && authResult.profile?.role !== 'super_admin') {
     return {
       ok: false,
       response: NextResponse.json(
         { error: 'Acesso proibido: privilégio de administrador necessário.' },
+        { status: 403 }
+      ),
+    };
+  }
+
+  return authResult;
+}
+
+export async function requireSuperAdminUser(): Promise<AuthGuardResult> {
+  const authResult = await requireAuthUser();
+  if (!authResult.ok) return authResult;
+
+  if (authResult.profile?.role !== 'super_admin') {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: 'Acesso proibido: ação exclusiva do Super Admin.' },
         { status: 403 }
       ),
     };

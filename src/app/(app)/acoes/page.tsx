@@ -1,277 +1,244 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
 import {
-  Hand,
-  FileText,
-  CheckCircle2,
-  Share2,
-  Users,
-  Plus,
-  Sparkles,
-  ShieldCheck,
+  FileSignature,
   Search,
-  Check,
-  Megaphone,
+  Plus,
+  Download,
+  ExternalLink,
+  CheckCircle2,
+  Clock,
   Landmark,
-  FileCheck2,
+  FileText,
+  Sparkles,
+  Users,
+  AlertCircle,
 } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/Button';
 import { MinutaModal, MinutaData } from '@/components/acoes/MinutaModal';
 import { CriarAbaixoAssinadoModal } from '@/components/acoes/CriarAbaixoAssinadoModal';
 import { PautaIACard } from '@/components/feed/PautaIACard';
-import { usePautas } from '@/hooks/useFeedReal';
+import { usePautas, useCidadeStatus } from '@/hooks/useFeedReal';
 import { useAuthStore } from '@/stores/authStore';
+import { Peticao } from '@/types/database';
 
-export interface CausaCivica extends MinutaData {
-  categoria: 'zoneamento' | 'zeladoria' | 'gastos' | 'transporte' | 'seguranca';
-  destaque?: boolean;
+function buildMinutaFromPeticao(p: Peticao): MinutaData {
+  const args = Array.isArray(p.argumentos_moradores) && p.argumentos_moradores.length > 0
+    ? p.argumentos_moradores
+    : [
+        p.resumo ||
+          p.pauta?.impacto_bairro ||
+          'Manifestação cívica formal amparada no Art. 5º, XXXIV, "a" da CF/88.',
+      ];
+
+  return {
+    id: p.id,
+    titulo: p.titulo || p.pauta?.titulo || 'Petição Cívica ConectaBr',
+    resumo:
+      p.minuta_texto ||
+      p.resumo ||
+      p.pauta?.resumo_ia ||
+      'Solicitação formal dos cidadãos ao Poder Legislativo Municipal.',
+    bairro: p.bairro || p.pauta?.bairro_alvo || 'Centro',
+    cidade: p.cidade || 'São José dos Campos',
+    estado: p.estado || 'SP',
+    vereadorAlvo: p.vereador_alvo || p.pauta?.vereador_proponente || 'Câmara Municipal',
+    totalAssinaturas: Number(p.total_assinaturas) || 0,
+    meta: Number(p.meta_assinaturas) || 50,
+    tipoConsenso: p.tipo === 'oposicao_ato' ? 'discordar' : 'comunitario',
+    dataCriacao: new Date(p.created_at || Date.now()).toLocaleDateString('pt-BR'),
+    protocoloReferencia: p.protocolo_digital || `CBR-${p.id.slice(0, 6).toUpperCase()}`,
+    justificativas: args,
+  };
 }
 
-const CAUSAS_INICIAIS: CausaCivica[] = [
-  {
-    id: 'causa-sjc-cassiano',
-    titulo: 'Revisão do Plano Viário e Faixas Exclusivas na Av. Cassiano Ricardo',
-    bairro: 'Jardim Aquárius',
-    cidade: 'São José dos Campos',
-    estado: 'SP',
-    totalAssinaturas: 142,
-    meta: 200,
-    tipoConsenso: 'discordar',
-    categoria: 'transporte',
-    destaque: true,
-    protocoloReferencia: 'SJC-LEG-2026-042',
-    vereadorAlvo: 'Marcio Roberto',
-    resumo:
-      'Originada do consenso de 142 votos de moradores do Jardim Aquárius na pauta de alteração viária e estacionamentos da Câmara Municipal de São José dos Campos. Os moradores reivindicam a manutenção das faixas de acesso e recuo seguro para pedestres.',
-    justificativas: [
-      'Gargalo severo no trânsito durante horários de pico entre 17h30 e 19h30.',
-      'Ausência de estudo prévio de impacto de tráfego apresentado aos moradores locais.',
-      'Comprometimento do acesso de ambulâncias e serviços emergenciais.',
-    ],
-    dataCriacao: '10/11/2026',
-  },
-  {
-    id: 'causa-sjc-taxas',
-    titulo: 'Rejeição ao Reajuste Extraordinário de Taxas de Resíduos Noturnos',
-    bairro: 'Centro',
-    cidade: 'São José dos Campos',
-    estado: 'SP',
-    totalAssinaturas: 268,
-    meta: 250,
-    tipoConsenso: 'discordar',
-    categoria: 'gastos',
-    destaque: false,
-    protocoloReferencia: 'SJC-LEG-2026-019',
-    vereadorAlvo: 'Comissão de Economia e Finanças',
-    resumo:
-      'Mobilização de comerciantes e moradores da região central para suspensão do edital de cobrança de taxa de recolhimento especial após as 22h sem audiência pública participativa.',
-    justificativas: [
-      'Bitributação em relação ao IPTU já recolhido para zeladoria urbana.',
-      'Falta de cronograma transparente de implementação das rotas.',
-    ],
-    dataCriacao: '05/11/2026',
-  },
-  {
-    id: 'causa-sjc-linha-verde',
-    titulo: 'Fiscalização e Recapeamento Asfáltico com Drenagem na Linha Verde',
-    bairro: 'Zona Sul',
-    cidade: 'São José dos Campos',
-    estado: 'SP',
-    totalAssinaturas: 89,
-    meta: 100,
-    tipoConsenso: 'comunitario',
-    categoria: 'zeladoria',
-    destaque: false,
-    protocoloReferencia: 'SJC-ZEL-2026-118',
-    resumo:
-      'Solicitação formal de vistoria na pavimentação e escoamento pluvial dos trechos da Linha Verde que sofrem com acúmulo de água e desgaste após períodos de fortes chuvas.',
-    justificativas: [
-      'Risco constante de aquaplanagem de motociclistas e veículos.',
-      'Bueiros sem limpeza regular há mais de 4 meses segundo os vizinhos.',
-    ],
-    dataCriacao: '12/11/2026',
-  },
-];
-
 export default function AcoesPage() {
-  const user = useAuthStore((s) => s.user);
+  const { user, isAuthenticated } = useAuthStore();
+  const queryClient = useQueryClient();
+
   const userCidade = user?.cidade || 'São José dos Campos';
+  const userEstado = user?.estado || 'SP';
   const userBairro = user?.bairro || 'Jardim Aquárius';
 
-  // 1. Aba Principal: 'atos' (Decisões da Câmara) ou 'peticoes' (Abaixo-Assinados com Quórum)
   const [mainTab, setMainTab] = useState<'atos' | 'peticoes'>('atos');
-
-  // Busca as pautas reais do Diário Oficial
-  const { data: pautas = [], isLoading: loadingPautas } = usePautas('cidade', userCidade, userBairro);
-
-  // Estados das Petições
-  const [causas, setCausas] = useState<CausaCivica[]>(CAUSAS_INICIAIS);
-  const [minhasAssinaturas, setMinhasAssinaturas] = useState<Record<string, boolean>>({});
   const [subTabPeticoes, setSubTabPeticoes] = useState<'todas' | 'prontas' | 'assinadas'>('todas');
   const [search, setSearch] = useState('');
+  const [signingId, setSigningId] = useState<string | null>(null);
+  const [signError, setSignError] = useState<string | null>(null);
+  const [createdNotice, setCreatedNotice] = useState<string | null>(null);
 
-  // Modais
   const [minutaSelecionada, setMinutaSelecionada] = useState<MinutaData | null>(null);
   const [isMinutaOpen, setIsMinutaOpen] = useState(false);
   const [isCriarOpen, setIsCriarOpen] = useState(false);
 
-  // Carrega assinaturas salvas do localStorage
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      const saved = localStorage.getItem('conectabr_user_petitions');
-      if (saved) {
-        setMinhasAssinaturas(JSON.parse(saved));
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('tab') === 'peticoes') {
+        setMainTab('peticoes');
       }
-    } catch (e) {
-      console.warn('Erro ao carregar assinaturas:', e);
     }
   }, []);
 
-  const handleAssinar = (causaId: string) => {
-    const jaAssinou = !!minhasAssinaturas[causaId];
-    const novoEstado = !jaAssinou;
+  const { data: cidadeStatus } = useCidadeStatus(userCidade, userEstado);
+  const { data: pautas = [], isLoading: loadingPautas } = usePautas('cidade', userCidade, userBairro);
 
-    setMinhasAssinaturas((prev) => {
-      const next = { ...prev, [causaId]: novoEstado };
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('conectabr_user_petitions', JSON.stringify(next));
+  const {
+    data: peticoesPayload,
+    isLoading: loadingPeticoes,
+    refetch: refetchPeticoes,
+  } = useQuery({
+    queryKey: ['peticoes_oficiais', userCidade, userEstado, isAuthenticated],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/peticoes?cidade=${encodeURIComponent(userCidade)}&estado=${encodeURIComponent(userEstado)}`
+      );
+      if (!res.ok) {
+        throw new Error('Falha ao carregar petições.');
       }
-      return next;
-    });
-
-    setCausas((prev) =>
-      prev.map((c) => {
-        if (c.id !== causaId) return c;
-        const diff = novoEstado ? 1 : -1;
-        return {
-          ...c,
-          totalAssinaturas: Math.max(1, c.totalAssinaturas + diff),
-        };
-      })
-    );
-  };
-
-  const handleOpenMinuta = (causa: CausaCivica) => {
-    setMinutaSelecionada(causa);
-    setIsMinutaOpen(true);
-  };
-
-  const handleNovaCausaCreated = (novaCausa: {
-    titulo: string;
-    bairro: string;
-    cidade: string;
-    estado: string;
-    meta: number;
-    resumo: string;
-  }) => {
-    const nova: CausaCivica = {
-      id: `causa-custom-${Date.now()}`,
-      titulo: novaCausa.titulo,
-      bairro: novaCausa.bairro,
-      cidade: novaCausa.cidade,
-      estado: novaCausa.estado,
-      totalAssinaturas: 1,
-      meta: novaCausa.meta,
-      tipoConsenso: 'comunitario',
-      categoria: 'zeladoria',
-      resumo: novaCausa.resumo,
-      justificativas: ['Mobilização comunitária iniciada por moradores locais.'],
-      dataCriacao: new Date().toLocaleDateString('pt-BR'),
-      protocoloReferencia: `CBR-${novaCausa.cidade.substring(0, 3).toUpperCase()}-${Date.now().toString().slice(-4)}`,
-    };
-
-    setCausas((prev) => [nova, ...prev]);
-    handleAssinar(nova.id);
-  };
-
-  // Filtros de busca nas Petições
-  const causasFiltradas = causas.filter((c) => {
-    const matchSearch =
-      c.titulo.toLowerCase().includes(search.toLowerCase()) ||
-      c.bairro.toLowerCase().includes(search.toLowerCase()) ||
-      c.cidade.toLowerCase().includes(search.toLowerCase());
-
-    if (!matchSearch) return false;
-
-    if (subTabPeticoes === 'prontas') {
-      return c.totalAssinaturas >= c.meta;
-    }
-    if (subTabPeticoes === 'assinadas') {
-      return !!minhasAssinaturas[c.id];
-    }
-    return true;
+      return (await res.json()) as { peticoes: Peticao[]; quorumCidade: number };
+    },
+    staleTime: 1000 * 30,
   });
 
+  const peticoes = peticoesPayload?.peticoes ?? [];
+  const quorumCidade = cidadeStatus?.quorum_peticao ?? peticoesPayload?.quorumCidade ?? 50;
+
+  const filteredPeticoes = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return peticoes.filter((p) => {
+      if (subTabPeticoes === 'assinadas' && !p.user_assinou) return false;
+      if (
+        subTabPeticoes === 'prontas' &&
+        p.status !== 'entregue' &&
+        p.status !== 'respondida' &&
+        (p.total_assinaturas || 0) < (p.meta_assinaturas || quorumCidade)
+      ) {
+        return false;
+      }
+      if (!q) return true;
+      const hay = `${p.titulo || ''} ${p.resumo || ''} ${p.bairro || ''} ${p.vereador_alvo || ''}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }, [peticoes, search, subTabPeticoes, quorumCidade]);
+
+  const handleAssinar = async (peticaoId: string) => {
+    setSignError(null);
+    if (!isAuthenticated) {
+      setSignError('Entre com sua conta para registrar sua assinatura única.');
+      return;
+    }
+
+    setSigningId(peticaoId);
+    try {
+      const res = await fetch('/api/peticoes/assinar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ peticao_id: peticaoId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSignError(data.error || 'Não foi possível registrar sua assinatura.');
+        return;
+      }
+
+      queryClient.setQueryData(
+        ['peticoes_oficiais', userCidade, userEstado, isAuthenticated],
+        (old: { peticoes: Peticao[]; quorumCidade: number } | undefined) => {
+          if (!old) return old;
+          return {
+            ...old,
+            peticoes: old.peticoes.map((item) =>
+              item.id === peticaoId
+                ? {
+                    ...item,
+                    user_assinou: Boolean(data.assinado),
+                    total_assinaturas: Number(data.total_assinaturas ?? item.total_assinaturas),
+                  }
+                : item
+            ),
+          };
+        }
+      );
+    } catch {
+      setSignError('Erro de rede ao assinar petição.');
+    } finally {
+      setSigningId(null);
+    }
+  };
+
+  const handleNovaPeticaoCriada = () => {
+    setMainTab('peticoes');
+    setCreatedNotice(
+      '✅ Sua proposta foi enviada para análise rápida da moderação! Ela já aparece abaixo para você acompanhar.'
+    );
+    void refetchPeticoes();
+  };
+
   return (
-    <div className="w-full max-w-md mx-auto pb-24 space-y-4">
-      {/* Cabeçalho da Central de Ações */}
-      <div className="px-4 pt-4 flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-black text-zinc-950 tracking-tight leading-tight">
-            Central Cívica & Ações
-          </h2>
-          <p className="text-xs text-zinc-500 mt-0.5">
-            Monitoramento de atos e petições de {userCidade}
-          </p>
+    <div className="max-w-md mx-auto pb-24 min-h-screen bg-zinc-50">
+      {/* Banner Topo Cívico */}
+      <div className="bg-white border-b border-zinc-200 px-4 pt-4 pb-3 space-y-3 sticky top-14 z-20">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-base font-black text-zinc-950 tracking-tight flex items-center space-x-1.5">
+              <Landmark className="w-4 h-4 text-crimson-600" />
+              <span>Ações &amp; Câmara</span>
+            </h1>
+            <p className="text-[11px] text-zinc-500 font-medium">
+              {userCidade}/{userEstado} • Quórum de petição: {quorumCidade} votos
+            </p>
+          </div>
+
+          {mainTab === 'peticoes' && (
+            <button
+              onClick={() => setIsCriarOpen(true)}
+              className="py-1.5 px-3 rounded-full bg-crimson-600 hover:bg-crimson-700 text-white text-xs font-bold flex items-center space-x-1 shadow-crimson-btn transition-transform active:scale-95 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5 stroke-[3]" />
+              <span>Propor</span>
+            </button>
+          )}
         </div>
 
-        {mainTab === 'peticoes' && (
-          <button
-            onClick={() => setIsCriarOpen(true)}
-            className="p-2 bg-crimson-600 hover:bg-crimson-700 active:scale-95 text-white rounded-full shadow-crimson-btn flex items-center justify-center transition-all cursor-pointer"
-            title="Iniciar novo abaixo-assinado"
-          >
-            <Plus className="w-5 h-5 stroke-[2.5]" />
-          </button>
-        )}
-      </div>
-
-      {/* Seletor Principal de Abas */}
-      <div className="px-4">
-        <div className="flex bg-zinc-100 p-1 rounded-2xl text-xs font-black">
+        {/* Seletor Principal: Decisões da Câmara vs Petições Oficiais */}
+        <div className="grid grid-cols-2 p-1 bg-zinc-100 rounded-2xl border border-zinc-200/80">
           <button
             onClick={() => setMainTab('atos')}
-            className={`flex-1 py-2.5 rounded-xl transition-all flex items-center justify-center space-x-1.5 cursor-pointer ${
+            className={`py-2 px-3 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
               mainTab === 'atos'
                 ? 'bg-white text-crimson-700 shadow-xs'
                 : 'text-zinc-500 hover:text-zinc-900'
             }`}
           >
-            <Landmark className="w-4 h-4" />
-            <span>Decisões da Câmara ({pautas.length})</span>
+            Decisões da Câmara ({pautas.length})
           </button>
-
           <button
             onClick={() => setMainTab('peticoes')}
-            className={`flex-1 py-2.5 rounded-xl transition-all flex items-center justify-center space-x-1.5 cursor-pointer ${
+            className={`py-2 px-3 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
               mainTab === 'peticoes'
                 ? 'bg-white text-crimson-700 shadow-xs'
                 : 'text-zinc-500 hover:text-zinc-900'
             }`}
           >
-            <FileCheck2 className="w-4 h-4" />
-            <span>Petições Oficiais ({causas.length})</span>
+            Petições Oficiais ({peticoes.length})
           </button>
         </div>
       </div>
 
-      {/* ───────────────────────────────────────────────────────────── */}
-      {/* ABA 1: DECISÕES DA CÂMARA (ATOS OFICIAIS DO DIÁRIO OFICIAL)   */}
-      {/* ───────────────────────────────────────────────────────────── */}
+      {/* ======================================================== */}
+      {/* ABA 1: DECISÕES DA CÂMARA (PAUTAS COM IA)                */}
+      {/* ======================================================== */}
       {mainTab === 'atos' && (
-        <div className="space-y-3">
-          {/* Caixa de Regra Cívica */}
-          <div className="mx-4 p-3 bg-zinc-50 border border-zinc-200 rounded-2xl text-xs space-y-1">
-            <div className="flex items-center space-x-1.5 text-zinc-900 font-bold">
-              <Megaphone className="w-4 h-4 text-crimson-600 shrink-0" />
-              <span>Como funciona a votação das decisões:</span>
-            </div>
-            <p className="text-[11px] text-zinc-600 leading-relaxed">
-              • <strong>Concordar:</strong> Registra apoio público ao ato ou licitação da Prefeitura/Câmara no banco de dados.<br />
-              • <strong>Discordar:</strong> Registra o seu argumento e <strong>conta como 1 assinatura de oposição</strong>. Ao alcançar <strong>50 discordâncias</strong>, a IA redige a minuta formal do Abaixo-Assinado para envio protocolar à Câmara após revisão do administrador.
-            </p>
+        <div>
+          <div className="px-4 py-2.5 bg-crimson-50/70 border-b border-crimson-100 text-[11px] text-crimson-950 flex items-center space-x-2">
+            <Sparkles className="w-4 h-4 text-crimson-600 shrink-0" />
+            <span>
+              Projetos e contratos traduzidos por IA. Ao atingir <strong>{quorumCidade} discordâncias</strong> na cidade, vira petição oficial para revisão no Admin.
+            </span>
           </div>
 
           {loadingPautas ? (
@@ -282,12 +249,12 @@ export default function AcoesPage() {
           ) : (
             <div className="divide-y divide-zinc-100 bg-white">
               {pautas.map((pauta) => (
-                <PautaIACard key={pauta.id} pauta={pauta} />
+                <PautaIACard key={pauta.id} pauta={pauta} cidadeQuorum={quorumCidade} />
               ))}
 
               {pautas.length === 0 && (
                 <div className="p-8 text-center text-xs text-zinc-400">
-                  Nenhuma deliberação da Câmara aguardando votação para esta localidade.
+                  Nenhuma deliberação da Câmara aguardando votação para {userCidade}.
                 </div>
               )}
             </div>
@@ -295,188 +262,238 @@ export default function AcoesPage() {
         </div>
       )}
 
-      {/* ───────────────────────────────────────────────────────────── */}
-      {/* ABA 2: PETIÇÕES & ABAIXO-ASSINADOS COM QUÓRUM                 */}
-      {/* ───────────────────────────────────────────────────────────── */}
+      {/* ======================================================== */}
+      {/* ABA 2: PETIÇÕES OFICIAIS (SUPABASE REAL)                 */}
+      {/* ======================================================== */}
       {mainTab === 'peticoes' && (
-        <div className="px-4 space-y-4">
-          {/* Barra de Pesquisa */}
-          <div className="relative">
-            <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Buscar por causa, bairro ou tema..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3.5 py-2.5 bg-white border border-zinc-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-crimson-600 focus:outline-none"
-            />
-          </div>
+        <div className="p-4 space-y-4">
+          {createdNotice && (
+            <div className="p-3 bg-crimson-50 border border-crimson-200 rounded-2xl text-xs font-bold text-crimson-900">
+              {createdNotice}
+            </div>
+          )}
 
-          {/* Sub-tabs das Petições */}
-          <div className="flex bg-zinc-100 p-1 rounded-2xl text-xs font-bold">
-            <button
-              onClick={() => setSubTabPeticoes('todas')}
-              className={`flex-1 py-1.5 rounded-xl transition-all ${
-                subTabPeticoes === 'todas'
-                  ? 'bg-white text-zinc-950 shadow-xs'
-                  : 'text-zinc-500 hover:text-zinc-800'
-              }`}
-            >
-              Todas ({causas.length})
-            </button>
-            <button
-              onClick={() => setSubTabPeticoes('prontas')}
-              className={`flex-1 py-1.5 rounded-xl transition-all ${
-                subTabPeticoes === 'prontas'
-                  ? 'bg-white text-zinc-950 shadow-xs'
-                  : 'text-zinc-500 hover:text-zinc-800'
-              }`}
-            >
-              Prontas ({causas.filter((c) => c.totalAssinaturas >= c.meta).length})
-            </button>
-            <button
-              onClick={() => setSubTabPeticoes('assinadas')}
-              className={`flex-1 py-1.5 rounded-xl transition-all ${
-                subTabPeticoes === 'assinadas'
-                  ? 'bg-white text-zinc-950 shadow-xs'
-                  : 'text-zinc-500 hover:text-zinc-800'
-              }`}
-            >
-              Assinadas ({Object.values(minhasAssinaturas).filter(Boolean).length})
-            </button>
-          </div>
+          {signError && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-950 flex items-center justify-between gap-2">
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>{signError}</span>
+              </div>
+              {!isAuthenticated && (
+                <Link href="/login?next=/acoes?tab=peticoes" className="font-bold text-crimson-700 underline shrink-0">
+                  Entrar
+                </Link>
+              )}
+            </div>
+          )}
 
-          {/* Lista de Petições */}
-          <div className="space-y-3.5">
-            {causasFiltradas.map((causa) => {
-              const assinado = !!minhasAssinaturas[causa.id];
-              const pct = Math.min(100, Math.round((causa.totalAssinaturas / causa.meta) * 100));
-              const bateuMeta = causa.totalAssinaturas >= causa.meta;
+          {/* Busca + Sub-filtros */}
+          <div className="space-y-2.5">
+            <div className="relative">
+              <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar petição por tema, bairro ou vereador..."
+                className="w-full pl-9 pr-3 py-2.5 bg-white border border-zinc-200 rounded-2xl text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-crimson-600"
+              />
+            </div>
 
-              return (
-                <article
-                  key={causa.id}
-                  className={`bg-white border rounded-2xl p-4 shadow-sm space-y-3 transition-all ${
-                    bateuMeta ? 'border-crimson-300 ring-1 ring-crimson-200' : 'border-zinc-200'
+            <div className="flex items-center space-x-2">
+              {[
+                { key: 'todas', label: 'Todas' },
+                { key: 'prontas', label: 'Quórum / Protocoladas' },
+                { key: 'assinadas', label: 'Assinadas por mim' },
+              ].map((t) => (
+                <button
+                  key={t.key}
+                  onClick={() => setSubTabPeticoes(t.key as any)}
+                  className={`px-3 py-1.5 rounded-full text-[11px] font-bold border transition-colors cursor-pointer ${
+                    subTabPeticoes === t.key
+                      ? 'bg-zinc-900 text-white border-zinc-900'
+                      : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-100'
                   }`}
                 >
-                  {/* Badge de Status */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-1.5">
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {loadingPeticoes ? (
+            <div className="py-16 flex flex-col items-center justify-center space-y-3 text-zinc-400">
+              <div className="w-6 h-6 border-2 border-crimson-600 border-t-transparent rounded-full animate-spin" />
+              <span className="text-xs font-semibold">Carregando petições oficiais...</span>
+            </div>
+          ) : filteredPeticoes.length === 0 ? (
+            <div className="bg-white border border-zinc-200 rounded-3xl p-6 text-center space-y-3">
+              <FileSignature className="w-8 h-8 text-crimson-500 mx-auto" />
+              <div className="space-y-1">
+                <h3 className="text-sm font-black text-zinc-950">Nenhuma petição publicada neste filtro</h3>
+                <p className="text-xs text-zinc-500">
+                  Vote em &ldquo;Decisões da Câmara&rdquo; ou crie agora uma petição comunitária para mobilizar os vizinhos.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="primary"
+                onClick={() => setIsCriarOpen(true)}
+                className="py-2.5 px-5 rounded-full text-xs font-bold bg-crimson-600 hover:bg-crimson-700 text-white"
+              >
+                + Propor Abaixo-Assinado
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredPeticoes.map((peticao) => {
+                const meta = Math.max(1, Number(peticao.meta_assinaturas) || quorumCidade);
+                const assinaturas = Number(peticao.total_assinaturas) || 0;
+                const pct = Math.min(100, Math.round((assinaturas / meta) * 100));
+                const isEmRevisao = peticao.status === 'pendente_revisao' || peticao.status === 'rascunho';
+                const isEntregue = peticao.status === 'entregue' || peticao.status === 'respondida';
+                const tituloDisplay = peticao.titulo || peticao.pauta?.titulo || 'Petição Cívica';
+                const resumoDisplay =
+                  peticao.resumo || peticao.pauta?.impacto_bairro || 'Solicitação oficial encaminhada à Câmara.';
+
+                return (
+                  <article
+                    key={peticao.id}
+                    className="bg-white border border-zinc-200 rounded-3xl p-4 shadow-2xs space-y-3"
+                  >
+                    <div className="flex items-center justify-between gap-2">
                       <span
-                        className={`inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide ${
-                          bateuMeta
-                            ? 'bg-crimson-100 text-crimson-800 border border-crimson-200'
-                            : 'bg-zinc-100 text-zinc-700'
+                        className={`text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full border ${
+                          isEmRevisao
+                            ? 'bg-amber-50 text-amber-800 border-amber-200'
+                            : isEntregue
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                            : 'bg-crimson-50 text-crimson-800 border-crimson-200'
                         }`}
                       >
-                        <Hand className="w-3 h-3" />
-                        <span>{bateuMeta ? '🔥 Quórum Atingido' : 'Em Mobilização'}</span>
+                        {isEmRevisao
+                          ? '⏳ Em Revisão no Admin'
+                          : peticao.status === 'respondida'
+                          ? '🏛️ Respondida pela Câmara'
+                          : isEntregue
+                          ? '📨 Protocolada na Câmara'
+                          : '✍️ Coleta Aberta'}
                       </span>
-                      <span className="text-[10px] text-zinc-400 font-semibold">• {causa.bairro}</span>
-                    </div>
 
-                    <span className="text-[10px] font-mono text-zinc-400">
-                      {causa.protocoloReferencia || 'Oficial'}
-                    </span>
-                  </div>
-
-                  {/* Título da Causa */}
-                  <h3 className="font-extrabold text-sm text-zinc-950 leading-snug">
-                    {causa.titulo}
-                  </h3>
-
-                  {/* Resumo */}
-                  <p className="text-xs text-zinc-600 line-clamp-2 leading-relaxed">
-                    {causa.resumo}
-                  </p>
-
-                  {/* Termômetro de Assinaturas */}
-                  <div className="space-y-1.5 pt-0.5">
-                    <div className="w-full bg-zinc-100 h-2.5 rounded-full overflow-hidden p-0.5">
-                      <div
-                        className={`h-full rounded-full transition-all duration-700 ${
-                          bateuMeta
-                            ? 'bg-crimson-600'
-                            : 'bg-gradient-to-r from-crimson-500 to-crimson-600'
-                        }`}
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between text-[11px] font-medium text-zinc-500">
-                      <span className="font-bold text-zinc-800">
-                        {causa.totalAssinaturas} assinaturas auditadas
-                      </span>
-                      <span className={bateuMeta ? 'font-bold text-crimson-700' : ''}>
-                        {bateuMeta ? 'Meta Batida (Pronta para Protocolo)' : `Meta: ${causa.meta}`}
+                      <span className="text-[11px] font-semibold text-zinc-400">
+                        {peticao.bairro || 'Geral'} • {peticao.cidade}/{peticao.estado}
                       </span>
                     </div>
-                  </div>
 
-                  {/* Botões de Ação */}
-                  <div className="pt-1 flex items-center space-x-2">
-                    <button
-                      onClick={() => handleAssinar(causa.id)}
-                      className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5 shadow-sm active:scale-95 cursor-pointer ${
-                        assinado
-                          ? 'bg-zinc-900 text-white hover:bg-zinc-800'
-                          : 'bg-crimson-600 hover:bg-crimson-700 text-white shadow-crimson-btn'
-                      }`}
-                    >
-                      {assinado ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 stroke-[3]" />
-                          <span>Você assinou</span>
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Assinar Digitalmente</span>
-                        </>
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-black text-zinc-950 leading-snug">{tituloDisplay}</h3>
+                      <p className="text-xs text-zinc-600 leading-relaxed line-clamp-3">{resumoDisplay}</p>
+                      <p className="text-[11px] font-bold text-crimson-700">
+                        Destinatário: {peticao.vereador_alvo || peticao.pauta?.vereador_proponente || 'Câmara Municipal'}
+                      </p>
+                    </div>
+
+                    {/* Progresso de assinaturas */}
+                    <div className="space-y-1.5 pt-1">
+                      <div className="flex items-center justify-between text-[11px] font-bold">
+                        <span className="text-zinc-900 flex items-center space-x-1">
+                          <Users className="w-3.5 h-3.5 text-crimson-600" />
+                          <span>{assinaturas} assinaturas únicas</span>
+                        </span>
+                        <span className="text-zinc-500">
+                          Meta: {meta} ({pct}%)
+                        </span>
+                      </div>
+                      <div className="w-full h-2 bg-zinc-100 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full transition-all duration-500 ${
+                            isEntregue ? 'bg-emerald-500' : 'bg-crimson-600'
+                          }`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {peticao.resposta_camara && (
+                      <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-950">
+                        <strong>Resposta Institucional:</strong> {peticao.resposta_camara}
+                      </div>
+                    )}
+
+                    {/* Botões de Ação */}
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      {peticao.status === 'aberta' ? (
+                        <Button
+                          type="button"
+                          variant={peticao.user_assinou ? 'outline' : 'primary'}
+                          isLoading={signingId === peticao.id}
+                          onClick={() => void handleAssinar(peticao.id)}
+                          className={`flex-1 py-2 px-3 rounded-full text-xs font-bold ${
+                            peticao.user_assinou
+                              ? 'border-crimson-600 text-crimson-700 bg-crimson-50'
+                              : 'bg-crimson-600 hover:bg-crimson-700 text-white shadow-crimson-btn'
+                          }`}
+                        >
+                          {peticao.user_assinou ? (
+                            <>
+                              <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                              <span>Assinado por você</span>
+                            </>
+                          ) : (
+                            <>
+                              <FileSignature className="w-3.5 h-3.5 mr-1" />
+                              <span>Assinar Petição</span>
+                            </>
+                          )}
+                        </Button>
+                      ) : isEmRevisao ? (
+                        <span className="flex-1 py-2 px-3 rounded-full bg-amber-50 border border-amber-200 text-amber-900 text-[11px] font-bold text-center flex items-center justify-center space-x-1">
+                          <Clock className="w-3.5 h-3.5" />
+                          <span>Aguardando aprovação para abrir coleta</span>
+                        </span>
+                      ) : null}
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMinutaSelecionada(buildMinutaFromPeticao(peticao));
+                          setIsMinutaOpen(true);
+                        }}
+                        className="py-2 px-3 rounded-full border border-zinc-200 hover:bg-zinc-50 text-xs font-bold text-zinc-700 flex items-center space-x-1 cursor-pointer"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        <span>Minuta</span>
+                      </button>
+
+                      {!isEmRevisao && (
+                        <a
+                          href={`/api/peticao/gerar-pdf?peticao_id=${peticao.id}`}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          className="py-2 px-3 rounded-full border border-zinc-200 hover:bg-zinc-50 text-xs font-bold text-zinc-700 flex items-center space-x-1"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>PDF</span>
+                        </a>
                       )}
-                    </button>
+                    </div>
 
-                    <button
-                      onClick={() => handleOpenMinuta(causa)}
-                      className="py-2.5 px-3 rounded-xl border border-zinc-200 text-zinc-700 hover:bg-zinc-50 hover:text-zinc-950 text-xs font-semibold flex items-center space-x-1 transition-colors cursor-pointer"
-                      title="Ver minuta formal do abaixo-assinado"
-                    >
-                      <FileText className="w-4 h-4 text-crimson-600" />
-                      <span className="hidden sm:inline">Minuta PDF</span>
-                    </button>
-                  </div>
-                </article>
-              );
-            })}
-
-            {causasFiltradas.length === 0 && (
-              <div className="p-8 text-center bg-white border border-zinc-200 rounded-2xl space-y-2">
-                <p className="text-xs font-bold text-zinc-700">Nenhuma petição encontrada.</p>
-                <p className="text-[11px] text-zinc-500">
-                  Inicie um novo abaixo-assinado para a sua rua ou vote nas decisões da Câmara!
-                </p>
-                <Button
-                  variant="primary"
-                  onClick={() => setIsCriarOpen(true)}
-                  className="mt-2 text-xs py-2 px-4 rounded-xl bg-crimson-600 hover:bg-crimson-700 text-white shadow-crimson-btn"
-                >
-                  Criar Abaixo-Assinado
-                </Button>
-              </div>
-            )}
-          </div>
-
-          {/* Dossiê Jurídico Constitucional */}
-          <div className="p-4 bg-zinc-50 rounded-2xl border border-dashed border-zinc-200 text-center space-y-1">
-            <p className="text-xs font-bold text-zinc-800 flex items-center justify-center space-x-1">
-              <ShieldCheck className="w-4 h-4 text-crimson-600" />
-              <span>Validade Jurídica (Art. 5º, XXXIV da Constituição Federal)</span>
-            </p>
-            <p className="text-[11px] text-zinc-500 leading-relaxed">
-              Toda petição gerada pelo ConectaBr respeita o Direito de Petição aos Poderes Públicos em defesa de direitos ou contra ilegalidade ou abuso de poder.
-            </p>
-          </div>
+                    {peticao.pauta?.link_pdf_original && (
+                      <a
+                        href={peticao.pauta.link_pdf_original}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        className="inline-flex items-center space-x-1 text-[11px] font-semibold text-zinc-500 hover:text-crimson-700"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        <span>Ver ato original no Diário Oficial</span>
+                      </a>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -491,7 +508,8 @@ export default function AcoesPage() {
       <CriarAbaixoAssinadoModal
         isOpen={isCriarOpen}
         onClose={() => setIsCriarOpen(false)}
-        onCreated={handleNovaCausaCreated}
+        onCreated={handleNovaPeticaoCriada}
+        quorumCidade={quorumCidade}
       />
     </div>
   );

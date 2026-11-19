@@ -37,10 +37,13 @@ import {
   Users,
   UserCheck,
   Lock,
+  Crown,
+  Scale,
+  Globe,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { PautaIASummarized, SYSTEM_SUMMARIZER_PROMPT } from '@/prompts/summarizer';
-import { PautaIA } from '@/types/database';
+import { CidadeConfig, PautaIA, Peticao } from '@/types/database';
 import { EdicaoSJC } from '@/app/api/diario/sjc/route';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -54,72 +57,49 @@ interface AdminCidadao {
   cidade: string;
   estado: string;
   nivel_verificacao: 0 | 1 | 2;
-  role: 'cidadao' | 'admin';
+  role: 'cidadao' | 'admin' | 'super_admin';
   created_at: string;
 }
 
-export interface PeticaoModeracao {
-  id: string;
-  titulo: string;
-  bairro: string;
-  cidade: string;
-  totalDiscordancias: number;
-  quorumMinimo: number;
-  vereadorAlvo: string;
-  emailAlvo: string;
-  argumentosMoradores: string[];
-  minutaIA: string;
-  status: 'pendente_revisao' | 'aprovada_enviada' | 'rejeitada';
-  dataQuorum: string;
-  simulouEnvio?: boolean;
+interface AdminCidadeRow extends CidadeConfig {
+  total_cadastrados?: number;
 }
 
-const PETICOES_MODERACAO_INICIAIS: PeticaoModeracao[] = [
-  {
-    id: 'pet-mod-1',
-    titulo: 'Petição Popular contra o Fechamento de Faixas de Trânsito na Av. Cassiano Ricardo',
-    bairro: 'Jardim Aquárius',
-    cidade: 'São José dos Campos',
-    totalDiscordancias: 64,
-    quorumMinimo: 50,
-    vereadorAlvo: 'Marcio Roberto (Câmara Municipal)',
-    emailAlvo: 'gabinete.marcioroberto@camarasjc.sp.gov.br',
-    argumentosMoradores: [
-      'Gargalo severo no horário de pico entre 17h30 e 19h30.',
-      'Falta de estudo prévio de impacto de tráfego apresentado aos moradores.',
-      'Dificuldade de acesso para viaturas de resgate e ambulâncias.',
-    ],
-    minutaIA: 'Os abaixo-assinados, cidadãos residentes no Jardim Aquárius, com esteio no art. 5º, XXXIV da CF, requerem a imediata suspensão da alteração viária e a realização de audiência pública com a comunidade.',
-    status: 'pendente_revisao',
-    dataQuorum: 'Hoje às 14:20',
-  },
-  {
-    id: 'pet-mod-2',
-    titulo: 'Impugnação ao Edital de Cobrança Extraordinária de Coleta de Resíduos Noturnos',
-    bairro: 'Centro',
-    cidade: 'São José dos Campos',
-    totalDiscordancias: 82,
-    quorumMinimo: 50,
-    vereadorAlvo: 'Secretaria de Gestão Administrativa e Finanças',
-    emailAlvo: 'financas@sjc.sp.gov.br',
-    argumentosMoradores: [
-      'Bitributação indevida pois o IPTU já recolhe taxas de conservação urbana.',
-      'Ausência de diálogo com o comércio e moradores da área central.',
-    ],
-    minutaIA: 'Requer-se a revogação do edital e a demonstração contábil do rateio dos custos de coleta noturna, sob pena de representação junto ao Tribunal de Contas do Estado.',
-    status: 'pendente_revisao',
-    dataQuorum: 'Ontem às 21:05',
-  },
-];
+interface AdminPeticaoRow extends Omit<Peticao, 'pauta'> {
+  pauta?: {
+    id: string;
+    titulo: string;
+    resumo_ia: string;
+    impacto_bairro: string;
+    vereador_proponente: string;
+    fonte_diario: string | null;
+    votos_concordar: number;
+    votos_discordar: number;
+  } | null;
+}
 
 export default function AdminPage() {
-  const { user: currentUser, isAdmin, isLoading: authLoading } = useAuth();
+  const { user: currentUser, isAdmin, isSuperAdmin, isLoading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<
-    'diario_api' | 'manual_upload' | 'publicadas' | 'peticoes_mod' | 'cidadaos' | 'config'
+    'diario_api' | 'manual_upload' | 'publicadas' | 'peticoes_mod' | 'cidadaos' | 'cidades' | 'config'
   >('diario_api');
 
-  // Estado da Fila de Moderação de Petições Cívicas (Quórum Atingido)
-  const [peticoesFila, setPeticoesFila] = useState<PeticaoModeracao[]>(PETICOES_MODERACAO_INICIAIS);
+  // Fila real de moderação de petições (Supabase /api/admin/peticoes)
+  const [peticoesFila, setPeticoesFila] = useState<AdminPeticaoRow[]>([]);
+  const [loadingPeticoes, setLoadingPeticoes] = useState(false);
+  const [peticaoAcaoId, setPeticaoAcaoId] = useState<string | null>(null);
+  const [peticaoNotice, setPeticaoNotice] = useState<string | null>(null);
+
+  // Gestão de Cidades & Quórum (Supabase /api/admin/cidades)
+  const [cidadesList, setCidadesList] = useState<AdminCidadeRow[]>([]);
+  const [loadingCidades, setLoadingCidades] = useState(false);
+  const [salvandoCidadeId, setSalvandoCidadeId] = useState<string | null>(null);
+  const [cidadeNotice, setCidadeNotice] = useState<string | null>(null);
+  const [novaCidadeNome, setNovaCidadeNome] = useState('');
+  const [novaCidadeUF, setNovaCidadeUF] = useState('SP');
+  const [novaCidadeQuorum, setNovaCidadeQuorum] = useState('50');
+  const [novaCidadeMeta, setNovaCidadeMeta] = useState('500');
+  const [novaCidadeEmailCamara, setNovaCidadeEmailCamara] = useState('');
 
   // Estado de Cidadãos, Criação de Admin & Status do Servidor
   const [cidadaos, setCidadaos] = useState<AdminCidadao[]>([]);
@@ -136,7 +116,13 @@ export default function AdminPage() {
     geminiConfigured: boolean;
     cronSecretConfigured: boolean;
     serviceRoleConfigured: boolean;
-  }>({ geminiConfigured: false, cronSecretConfigured: false, serviceRoleConfigured: false });
+    resendConfigured?: boolean;
+  }>({
+    geminiConfigured: false,
+    cronSecretConfigured: false,
+    serviceRoleConfigured: false,
+    resendConfigured: false,
+  });
   const [adminApiError, setAdminApiError] = useState<string | null>(null);
   const [testingGemini, setTestingGemini] = useState(false);
   const [geminiTestResult, setGeminiTestResult] = useState<{
@@ -271,8 +257,140 @@ export default function AdminPage() {
     if (isAdmin) {
       void carregarEdicoesDiario();
       void carregarCidadaosEStatus();
+      void carregarPeticoesModeracao();
+      void carregarCidadesConfig();
     }
   }, [isAdmin]);
+
+  const carregarPeticoesModeracao = async () => {
+    setLoadingPeticoes(true);
+    try {
+      const res = await fetch('/api/admin/peticoes');
+      if (res.ok) {
+        const data = await res.json();
+        setPeticoesFila(data.peticoes || []);
+      }
+    } catch (err) {
+      console.warn('Erro ao carregar petições de moderação:', err);
+    } finally {
+      setLoadingPeticoes(false);
+    }
+  };
+
+  const handleAcaoPeticao = async (
+    peticao: AdminPeticaoRow,
+    action: 'save_draft' | 'regenerar_ia' | 'aprovar_publicar' | 'protocolar_envio' | 'arquivar'
+  ) => {
+    setPeticaoAcaoId(peticao.id);
+    setPeticaoNotice(null);
+    try {
+      const res = await fetch('/api/admin/peticoes', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: peticao.id,
+          action,
+          titulo: peticao.titulo,
+          resumo: peticao.resumo,
+          minuta_texto: peticao.minuta_texto,
+          email_destino: peticao.email_destino,
+          vereador_alvo: peticao.vereador_alvo,
+          meta_assinaturas: peticao.meta_assinaturas,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error || 'Erro ao executar ação na petição.');
+        return;
+      }
+      if (data.peticao) {
+        setPeticoesFila((prev) => prev.map((p) => (p.id === peticao.id ? data.peticao : p)));
+      }
+      if (data.message) {
+        setPeticaoNotice(data.message);
+      }
+    } catch {
+      alert('Erro de rede ao moderar petição.');
+    } finally {
+      setPeticaoAcaoId(null);
+    }
+  };
+
+  const carregarCidadesConfig = async () => {
+    setLoadingCidades(true);
+    try {
+      const res = await fetch('/api/admin/cidades');
+      if (res.ok) {
+        const data = await res.json();
+        setCidadesList(data.cidades || []);
+      }
+    } catch (err) {
+      console.warn('Erro ao carregar configurações de cidades:', err);
+    } finally {
+      setLoadingCidades(false);
+    }
+  };
+
+  const handleSalvarCidade = async (cidade: AdminCidadeRow) => {
+    setSalvandoCidadeId(cidade.id);
+    setCidadeNotice(null);
+    try {
+      const res = await fetch('/api/admin/cidades', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: cidade.id,
+          status: cidade.status,
+          meta_usuarios: cidade.meta_usuarios,
+          quorum_peticao: cidade.quorum_peticao,
+          email_camara_padrao: cidade.email_camara_padrao,
+          email_ouvidoria_padrao: cidade.email_ouvidoria_padrao,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error || 'Falha ao salvar configuração da cidade.');
+        return;
+      }
+      setCidadeNotice(`✅ Cidade "${cidade.nome}/${cidade.estado}" atualizada (Quórum: ${cidade.quorum_peticao} votos).`);
+      void carregarCidadesConfig();
+    } catch {
+      alert('Erro de rede ao salvar cidade.');
+    } finally {
+      setSalvandoCidadeId(null);
+    }
+  };
+
+  const handleAdicionarCidade = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!novaCidadeNome.trim()) return;
+    setCidadeNotice(null);
+    try {
+      const res = await fetch('/api/admin/cidades', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nome: novaCidadeNome.trim(),
+          estado: novaCidadeUF.trim().toUpperCase(),
+          status: 'ativa',
+          meta_usuarios: Number(novaCidadeMeta) || 500,
+          quorum_peticao: Number(novaCidadeQuorum) || 50,
+          email_camara_padrao: novaCidadeEmailCamara.trim() || null,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error || 'Erro ao adicionar cidade.');
+        return;
+      }
+      setNovaCidadeNome('');
+      setNovaCidadeEmailCamara('');
+      setCidadeNotice(`✅ Cidade "${data.cidade?.nome}/${data.cidade?.estado}" configurada com quórum ${data.cidade?.quorum_peticao}.`);
+      void carregarCidadesConfig();
+    } catch {
+      alert('Erro de rede ao cadastrar cidade.');
+    }
+  };
 
   // 1. Busca as edições do Diário Oficial de SJC diretamente da API
   const carregarEdicoesDiario = async () => {
@@ -294,7 +412,10 @@ export default function AdminPage() {
   const carregarPautas = async (cidade: string = cidadeFiltro) => {
     setLoadingPautas(true);
     try {
-      const url = cidade === 'todas' ? '/api/pautas?cidade=todas' : `/api/pautas?cidade=${encodeURIComponent(cidade)}`;
+      const url =
+        cidade === 'todas'
+          ? '/api/pautas?cidade=todas&status=todos'
+          : `/api/pautas?cidade=${encodeURIComponent(cidade)}&status=todos`;
       const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
@@ -778,8 +899,9 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
               <span>⚠️ Modo Local (GEMINI_API_KEY no servidor)</span>
             </button>
           )}
-          <span className="text-[10px] bg-gray-100 text-gray-700 font-bold px-2.5 py-1 rounded-full border border-gray-200">
-            Curadoria Humana Ativa
+          <span className="text-[10px] bg-gray-100 text-gray-700 font-bold px-2.5 py-1 rounded-full border border-gray-200 flex items-center space-x-1">
+            {isSuperAdmin ? <Crown className="w-3 h-3 text-amber-600" /> : null}
+            <span>{isSuperAdmin ? 'Super Admin (Fundador)' : 'Moderador Admin'}</span>
           </span>
         </div>
       </div>
@@ -811,7 +933,7 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
             </span>
           </div>
           <p className="text-xs text-zinc-400 max-w-xl leading-relaxed">
-            Todas as madrugadas, a IA busca novas edições no portal da prefeitura de São José dos Campos, extrai decretos e obras por bairro e publica no feed do cidadão.
+            Todas as madrugadas, a IA baixa o PDF oficial no portal da prefeitura de São José dos Campos, extrai decretos e obras por bairro e envia para a fila de revisão (Aba 3) antes de ir ao ar.
           </p>
         </div>
 
@@ -902,9 +1024,9 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
         >
           <Stamp className="w-4 h-4 text-crimson-600" />
           <span>4. Moderação de Petições</span>
-          {peticoesFila.filter((p) => p.status === 'pendente_revisao').length > 0 && (
+          {peticoesFila.filter((p) => p.status === 'rascunho' || p.status === 'pendente_revisao').length > 0 && (
             <span className="px-1.5 py-0.5 rounded-full bg-crimson-600 text-white text-[10px] font-black">
-              {peticoesFila.filter((p) => p.status === 'pendente_revisao').length}
+              {peticoesFila.filter((p) => p.status === 'rascunho' || p.status === 'pendente_revisao').length}
             </span>
           )}
         </button>
@@ -926,6 +1048,21 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
 
         <button
           onClick={() => {
+            setActiveTab('cidades');
+            void carregarCidadesConfig();
+          }}
+          className={`py-3 px-2 sm:px-4 text-xs sm:text-sm font-black border-b-2 flex items-center space-x-2 transition-all whitespace-nowrap ${
+            activeTab === 'cidades'
+              ? 'border-crimson-600 text-crimson-800'
+              : 'border-transparent text-gray-500 hover:text-gray-900'
+          }`}
+        >
+          <Globe className="w-4 h-4 text-crimson-600" />
+          <span>6. Cidades & Quórum</span>
+        </button>
+
+        <button
+          onClick={() => {
             setActiveTab('config');
             void carregarCidadaosEStatus();
           }}
@@ -936,7 +1073,7 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
           }`}
         >
           <Sliders className="w-4 h-4" />
-          <span>6. IA & Servidor</span>
+          <span>7. IA & Servidor</span>
         </button>
       </div>
 
@@ -1586,16 +1723,44 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
                         👎 {pauta.votos_discordar || 0} Discordam
                       </span>
                       <span>Status: <strong className="text-gray-800">{pauta.status}</strong></span>
+                      <span>
+                        Quórum:{' '}
+                        <strong className="text-gray-800">
+                          {pauta.quorum_meta ? `${pauta.quorum_meta} (custom)` : 'Padrão cidade'}
+                        </strong>
+                      </span>
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => handleExcluirPauta(pauta.id)}
-                    className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
-                    title="Remover do feed"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center space-x-1.5 shrink-0">
+                    {pauta.status === 'pendente_revisao' && (
+                      <button
+                        onClick={async () => {
+                          const res = await fetch('/api/pautas', {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id: pauta.id, status: 'ativa' }),
+                          });
+                          if (res.ok) {
+                            void carregarPautas(cidadeFiltro);
+                          } else {
+                            alert('Falha ao aprovar pauta.');
+                          }
+                        }}
+                        className="px-2.5 py-1.5 bg-crimson-600 hover:bg-crimson-700 text-white rounded-lg text-[11px] font-bold"
+                      >
+                        Aprovar no Ar
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => handleExcluirPauta(pauta.id)}
+                      className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                      title="Remover do feed"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1604,7 +1769,7 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
       )}
 
       {/* ======================================================== */}
-      {/* ABA 4: MODERAÇÃO DE PETIÇÕES (QUÓRUM ATINGIDO)           */}
+      {/* ABA 4: MODERAÇÃO DE PETIÇÕES (BANCO REAL SUPABASE)       */}
       {/* ======================================================== */}
       {activeTab === 'peticoes_mod' && (
         <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-6">
@@ -1613,230 +1778,281 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
               <div className="flex items-center space-x-2">
                 <Stamp className="w-5 h-5 text-crimson-600" />
                 <h3 className="text-sm font-black text-gray-900">
-                  Fila de Moderação de Petições Cívicas (Quórum Atingido)
+                  Fila de Moderação de Petições Cívicas (Banco Real)
                 </h3>
               </div>
               <p className="text-xs text-gray-500 mt-1 max-w-2xl leading-relaxed">
-                Quando uma matéria da Câmara acumula <strong>50 discordâncias</strong> de moradores, a IA compila os argumentos e redige a minuta. O administrador humano revisa, corrige e aprova antes de disparar aos órgãos públicos.
+                Quando um projeto atinge o quórum da cidade em discordâncias (ou um cidadão submete causa comunitária), a petição aparece aqui para curadoria humana, geração de PDF e envio protocolar à Câmara.
               </p>
             </div>
 
-            <span className="text-[11px] font-bold px-3 py-1 bg-crimson-50 text-crimson-800 rounded-full border border-crimson-200 self-start sm:self-auto">
-              {peticoesFila.filter((p) => p.status === 'pendente_revisao').length} aguardando revisão
-            </span>
+            <div className="flex items-center space-x-2 self-start sm:self-auto">
+              <span className="text-[11px] font-bold px-3 py-1 bg-crimson-50 text-crimson-800 rounded-full border border-crimson-200">
+                {peticoesFila.filter((p) => p.status === 'rascunho' || p.status === 'pendente_revisao').length} aguardando revisão
+              </span>
+              <button
+                onClick={carregarPeticoesModeracao}
+                disabled={loadingPeticoes}
+                className="p-2 border border-gray-200 rounded-xl text-gray-500 hover:text-gray-900"
+                title="Recarregar fila"
+              >
+                <RefreshCw className={`w-4 h-4 ${loadingPeticoes ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
           </div>
 
+          {peticaoNotice && (
+            <div className="p-3 bg-crimson-50 border border-crimson-200 rounded-xl text-xs font-bold text-crimson-900">
+              {peticaoNotice}
+            </div>
+          )}
+
           <div className="space-y-5">
-            {peticoesFila.map((peticao) => {
-              const isPendente = peticao.status === 'pendente_revisao';
-              const isAprovada = peticao.status === 'aprovada_enviada';
+            {loadingPeticoes && peticoesFila.length === 0 ? (
+              <div className="py-12 text-center text-xs text-gray-400">
+                Carregando petições do Supabase...
+              </div>
+            ) : (
+              peticoesFila.map((peticao) => {
+                const isPendente = peticao.status === 'rascunho' || peticao.status === 'pendente_revisao';
+                const isAberta = peticao.status === 'aberta';
+                const isEntregue = peticao.status === 'entregue' || peticao.status === 'respondida';
+                const args = Array.isArray(peticao.argumentos_moradores) ? peticao.argumentos_moradores : [];
+                const isBusy = peticaoAcaoId === peticao.id;
 
-              return (
-                <div
-                  key={peticao.id}
-                  className={`border rounded-2xl p-4 sm:p-5 space-y-4 transition-all ${
-                    isPendente
-                      ? 'border-amber-300 bg-amber-50/20 shadow-xs'
-                      : isAprovada
-                      ? 'border-crimson-300 bg-crimson-50/10'
-                      : 'border-gray-200 opacity-60'
-                  }`}
-                >
-                  {/* Top Bar da Petição */}
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center space-x-2">
-                      <span
-                        className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full border ${
-                          isPendente
-                            ? 'bg-amber-100 text-amber-900 border-amber-300'
-                            : isAprovada
-                            ? 'bg-crimson-100 text-crimson-800 border-crimson-300'
-                            : 'bg-gray-100 text-gray-700 border-gray-200'
-                        }`}
-                      >
-                        {isPendente
-                          ? '⏳ Aguardando Curadoria Humana'
-                          : isAprovada
-                          ? '✅ Aprovada & Publicada em Ações'
-                          : '📁 Arquivada'}
+                return (
+                  <div
+                    key={peticao.id}
+                    className={`border rounded-2xl p-4 sm:p-5 space-y-4 transition-all ${
+                      isPendente
+                        ? 'border-amber-300 bg-amber-50/20 shadow-xs'
+                        : isAberta || isEntregue
+                        ? 'border-crimson-300 bg-crimson-50/10'
+                        : 'border-gray-200 opacity-60'
+                    }`}
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center flex-wrap gap-2">
+                        <span
+                          className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full border ${
+                            isPendente
+                              ? 'bg-amber-100 text-amber-900 border-amber-300'
+                              : isEntregue
+                              ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                              : isAberta
+                              ? 'bg-crimson-100 text-crimson-800 border-crimson-300'
+                              : 'bg-gray-100 text-gray-700 border-gray-200'
+                          }`}
+                        >
+                          {isPendente
+                            ? peticao.tipo === 'comunitaria'
+                              ? '📥 Proposta Comunitária (Revisão)'
+                              : '⏳ Quórum Batido (Revisão IA)'
+                            : isEntregue
+                            ? '📨 Protocolada na Câmara'
+                            : isAberta
+                            ? '✅ Aberta em /acoes'
+                            : '📁 Arquivada'}
+                        </span>
+
+                        <span className="text-xs font-bold text-gray-700">
+                          {peticao.bairro || 'Geral'} • {peticao.cidade}/{peticao.estado}
+                        </span>
+                      </div>
+
+                      <span className="text-[11px] font-mono text-gray-400">
+                        {peticao.protocolo_digital || new Date(peticao.created_at).toLocaleDateString('pt-BR')}
                       </span>
-
-                      <span className="text-xs font-bold text-gray-700">
-                        {peticao.bairro} • {peticao.cidade}
-                      </span>
                     </div>
 
-                    <span className="text-[11px] font-mono text-gray-400">
-                      Quórum batido: {peticao.dataQuorum}
-                    </span>
-                  </div>
-
-                  {/* Título da Causa */}
-                  <div>
-                    <h4 className="text-sm font-extrabold text-gray-900 leading-snug">
-                      {peticao.titulo}
-                    </h4>
-                    <p className="text-xs text-crimson-700 font-bold mt-0.5">
-                      Alvo: {peticao.vereadorAlvo}
-                    </p>
-                  </div>
-
-                  {/* Dados de Quórum */}
-                  <div className="p-3 bg-white rounded-xl border border-gray-200 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-                    <div>
-                      <span className="text-gray-400 block text-[10px] font-semibold">Assinaturas de Oposição:</span>
-                      <strong className="text-crimson-700 font-black text-sm">
-                        {peticao.totalDiscordancias} cidadãos
-                      </strong>
-                    </div>
-                    <div>
-                      <span className="text-gray-400 block text-[10px] font-semibold">Meta de Quórum:</span>
-                      <strong className="text-gray-900 font-bold text-sm">
-                        {peticao.quorumMinimo} votos (Atingido!)
-                      </strong>
-                    </div>
-                    <div className="col-span-2 sm:col-span-1">
-                      <span className="text-gray-400 block text-[10px] font-semibold">Fundamentação:</span>
-                      <strong className="text-gray-700 font-bold text-xs">
-                        Art. 5º, XXXIV CF
-                      </strong>
-                    </div>
-                  </div>
-
-                  {/* Argumentos dos Moradores */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-800 block">
-                      Motivos reais informados pelos moradores na votação:
-                    </label>
-                    <ul className="list-disc list-inside space-y-1 text-xs text-gray-600 bg-white p-3 rounded-xl border border-gray-200">
-                      {peticao.argumentosMoradores.map((arg, idx) => (
-                        <li key={idx} className="leading-relaxed">
-                          &ldquo;{arg}&rdquo;
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  {/* Minuta Formal da IA (Editável pelo Administrador) */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-gray-800 flex items-center space-x-1">
-                        <FileText className="w-4 h-4 text-crimson-600" />
-                        <span>Minuta Formal do Abaixo-Assinado (Editável pelo Administrador):</span>
-                      </label>
-                      <span className="text-[10px] text-gray-400">Pode ajustar o texto livremente</span>
-                    </div>
-                    <textarea
-                      rows={3}
-                      value={peticao.minutaIA}
-                      disabled={!isPendente}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setPeticoesFila((prev) =>
-                          prev.map((p) => (p.id === peticao.id ? { ...p, minutaIA: val } : p))
-                        );
-                      }}
-                      className="w-full p-3 bg-white border border-gray-200 rounded-xl text-xs font-sans text-gray-800 focus:ring-2 focus:ring-crimson-600 focus:outline-none leading-relaxed"
-                    />
-                  </div>
-
-                  {/* E-mail de Destino do Órgão / Vereador */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-700 block">
-                        E-mail oficial para envio protocolar:
-                      </label>
-                      <div className="relative">
-                        <Mail className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={peticao.titulo || peticao.pauta?.titulo || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setPeticoesFila((prev) =>
+                            prev.map((p) => (p.id === peticao.id ? { ...p, titulo: val } : p))
+                          );
+                        }}
+                        className="w-full font-extrabold text-sm text-gray-900 bg-white border border-gray-200 rounded-xl px-3 py-2"
+                      />
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <span className="text-gray-500 font-semibold">Destinatário:</span>
                         <input
-                          type="email"
-                          value={peticao.emailAlvo}
-                          disabled={!isPendente}
+                          type="text"
+                          value={peticao.vereador_alvo || peticao.pauta?.vereador_proponente || ''}
                           onChange={(e) => {
                             const val = e.target.value;
                             setPeticoesFila((prev) =>
-                              prev.map((p) => (p.id === peticao.id ? { ...p, emailAlvo: val } : p))
+                              prev.map((p) => (p.id === peticao.id ? { ...p, vereador_alvo: val } : p))
                             );
                           }}
-                          className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-mono text-gray-800 focus:ring-2 focus:ring-crimson-600 focus:outline-none"
+                          className="flex-1 min-w-[200px] px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-xs text-crimson-800 font-bold"
                         />
                       </div>
                     </div>
 
-                    {/* Botões de Ação do Administrador */}
-                    <div className="flex items-end space-x-2 pt-1">
-                      {isPendente ? (
-                        <>
+                    <div className="p-3 bg-white rounded-xl border border-gray-200 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                      <div>
+                        <span className="text-gray-400 block text-[10px] font-semibold">Assinaturas Únicas:</span>
+                        <strong className="text-crimson-700 font-black text-sm">
+                          {peticao.total_assinaturas} cidadãos
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="text-gray-400 block text-[10px] font-semibold">Meta da Petição:</span>
+                        <strong className="text-gray-900 font-bold text-sm">
+                          {peticao.meta_assinaturas} assinaturas
+                        </strong>
+                      </div>
+                      <div className="col-span-2 sm:col-span-1">
+                        <span className="text-gray-400 block text-[10px] font-semibold">Fundamentação:</span>
+                        <strong className="text-gray-700 font-bold text-xs">
+                          Art. 5º, XXXIV, &ldquo;a&rdquo; CF/88
+                        </strong>
+                      </div>
+                    </div>
+
+                    {args.length > 0 && (
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-gray-800 block">
+                          Argumentos / Motivos reais registrados:
+                        </label>
+                        <ul className="list-disc list-inside space-y-1 text-xs text-gray-600 bg-white p-3 rounded-xl border border-gray-200">
+                          {args.map((arg, idx) => (
+                            <li key={idx} className="leading-relaxed">
+                              &ldquo;{arg}&rdquo;
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <label className="text-xs font-bold text-gray-800 flex items-center space-x-1">
+                          <FileText className="w-4 h-4 text-crimson-600" />
+                          <span>Minuta Formal (Editável pelo Administrador):</span>
+                        </label>
+                        <div className="flex items-center space-x-2">
+                          {peticao.pauta_id && (
+                            <button
+                              type="button"
+                              disabled={isBusy}
+                              onClick={() => void handleAcaoPeticao(peticao, 'regenerar_ia')}
+                              className="text-[11px] font-bold text-crimson-700 hover:underline disabled:opacity-50"
+                            >
+                              ✨ Re-sintetizar com Gemini
+                            </button>
+                          )}
                           <button
-                            onClick={() => {
+                            type="button"
+                            disabled={isBusy}
+                            onClick={() => void handleAcaoPeticao(peticao, 'save_draft')}
+                            className="text-[11px] font-bold text-gray-600 hover:text-gray-900 underline"
+                          >
+                            Salvar Rascunho
+                          </button>
+                        </div>
+                      </div>
+                      <textarea
+                        rows={5}
+                        value={peticao.minuta_texto || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setPeticoesFila((prev) =>
+                            prev.map((p) => (p.id === peticao.id ? { ...p, minuta_texto: val } : p))
+                          );
+                        }}
+                        placeholder="Escreva ou gere via IA a minuta formal do abaixo-assinado..."
+                        className="w-full p-3 bg-white border border-gray-200 rounded-xl text-xs font-sans text-gray-800 focus:ring-2 focus:ring-crimson-600 focus:outline-none leading-relaxed"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-gray-700 block">
+                          E-mail oficial para protocolo (Câmara / Gabinete):
+                        </label>
+                        <div className="relative">
+                          <Mail className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                          <input
+                            type="email"
+                            value={peticao.email_destino || ''}
+                            placeholder="camara@municipio.sp.gov.br"
+                            onChange={(e) => {
+                              const val = e.target.value;
                               setPeticoesFila((prev) =>
-                                prev.map((p) =>
-                                  p.id === peticao.id ? { ...p, status: 'aprovada_enviada' } : p
-                                )
-                              );
-                              setPublishSuccess(
-                                `✅ Petição "${peticao.titulo}" foi APROVADA e publicada com sucesso na aba de Petições!`
+                                prev.map((p) => (p.id === peticao.id ? { ...p, email_destino: val } : p))
                               );
                             }}
-                            className="flex-1 py-2 px-3 bg-crimson-600 hover:bg-crimson-700 text-white rounded-xl text-xs font-bold flex items-center justify-center space-x-1 shadow-crimson-btn transition-transform active:scale-95 cursor-pointer"
-                          >
-                            <Check className="w-4 h-4 stroke-[3]" />
-                            <span>Aprovar Petição</span>
-                          </button>
+                            className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-mono text-gray-800 focus:ring-2 focus:ring-crimson-600 focus:outline-none"
+                          />
+                        </div>
+                      </div>
 
+                      <div className="flex flex-wrap items-end gap-2 pt-1">
+                        {isPendente && (
+                          <Button
+                            type="button"
+                            variant="primary"
+                            isLoading={isBusy}
+                            onClick={() => void handleAcaoPeticao(peticao, 'aprovar_publicar')}
+                            className="flex-1 py-2 px-3 bg-crimson-600 hover:bg-crimson-700 text-white rounded-xl text-xs font-bold"
+                          >
+                            <Check className="w-4 h-4 mr-1 stroke-[3]" />
+                            <span>Aprovar e Publicar em /acoes</span>
+                          </Button>
+                        )}
+
+                        <a
+                          href={`/api/peticao/gerar-pdf?peticao_id=${peticao.id}`}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          className="py-2 px-3 border border-gray-300 bg-white hover:bg-gray-50 text-gray-800 rounded-xl text-xs font-bold flex items-center space-x-1"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>PDF</span>
+                        </a>
+
+                        {peticao.status !== 'arquivada' && (
+                          <Button
+                            type="button"
+                            variant="primary"
+                            isLoading={isBusy}
+                            onClick={() => void handleAcaoPeticao(peticao, 'protocolar_envio')}
+                            className="py-2 px-3 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold"
+                          >
+                            <SendHorizontal className="w-3.5 h-3.5 mr-1" />
+                            <span>{isEntregue ? 'Reenviar Protocolo' : 'Protocolar E-mail + PDF'}</span>
+                          </Button>
+                        )}
+
+                        {peticao.status !== 'arquivada' && (
                           <button
+                            type="button"
+                            disabled={isBusy}
                             onClick={() => {
                               if (confirm('Deseja arquivar esta petição?')) {
-                                setPeticoesFila((prev) =>
-                                  prev.map((p) =>
-                                    p.id === peticao.id ? { ...p, status: 'rejeitada' } : p
-                                  )
-                                );
+                                void handleAcaoPeticao(peticao, 'arquivar');
                               }
                             }}
-                            className="py-2 px-3 border border-gray-200 hover:bg-gray-100 text-gray-600 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                            className="py-2 px-3 border border-gray-200 hover:bg-gray-100 text-gray-600 rounded-xl text-xs font-bold"
                           >
                             Arquivar
                           </button>
-                        </>
-                      ) : (
-                        <div className="flex items-center space-x-2 w-full">
-                          <button
-                            onClick={() => {
-                              setPeticoesFila((prev) =>
-                                prev.map((p) =>
-                                  p.id === peticao.id ? { ...p, simulouEnvio: true } : p
-                                )
-                              );
-                              alert(
-                                `📧 Petição e lista de ${peticao.totalDiscordancias} assinaturas auditadas enviada com sucesso para ${peticao.emailAlvo} sob Protocolo Digital CBR-${Date.now().toString().slice(-6)}!`
-                              );
-                            }}
-                            className="flex-1 py-2 px-3 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
-                          >
-                            <SendHorizontal className="w-3.5 h-3.5" />
-                            <span>
-                              {peticao.simulouEnvio ? 'Reenviar E-mail Protocolar' : 'Disparar E-mail ao Gabinete'}
-                            </span>
-                          </button>
-
-                          <Link
-                            href="/acoes"
-                            className="py-2 px-3 border border-crimson-200 bg-crimson-50 text-crimson-800 hover:bg-crimson-100 rounded-xl text-xs font-bold transition-colors"
-                          >
-                            Ver em Ações →
-                          </Link>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
 
-            {peticoesFila.length === 0 && (
+            {!loadingPeticoes && peticoesFila.length === 0 && (
               <div className="py-12 text-center text-xs text-gray-400">
-                Nenhuma petição com quórum aguardando moderação.
+                Nenhuma petição aguardando moderação ainda. Quando uma pauta atingir o quórum da cidade ou um morador propor um abaixo-assinado, ele aparecerá aqui.
               </div>
             )}
           </div>
@@ -1860,16 +2076,18 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
             </div>
 
             <div className="flex items-center space-x-2 self-start sm:self-auto">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowNovoAdminForm((prev) => !prev);
-                  setAdminCreateMsg(null);
-                }}
-                className="text-xs font-bold text-white bg-crimson-600 hover:bg-crimson-700 px-3 py-1.5 rounded-xl flex items-center space-x-1.5 shadow-sm"
-              >
-                <span>{showNovoAdminForm ? '✕ Fechar' : '+ Novo Admin'}</span>
-              </button>
+              {isSuperAdmin && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowNovoAdminForm((prev) => !prev);
+                    setAdminCreateMsg(null);
+                  }}
+                  className="text-xs font-bold text-white bg-crimson-600 hover:bg-crimson-700 px-3 py-1.5 rounded-xl flex items-center space-x-1.5 shadow-sm"
+                >
+                  <span>{showNovoAdminForm ? '✕ Fechar' : '+ Novo Admin'}</span>
+                </button>
+              )}
 
               <button
                 onClick={carregarCidadaosEStatus}
@@ -1894,7 +2112,13 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
             </div>
           )}
 
-          {showNovoAdminForm && (
+          {!isSuperAdmin && (
+            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900">
+              Você está conectado como <strong>Moderador Admin</strong>. Apenas o <strong>Super Admin</strong> pode cadastrar ou alterar privilégios de outros administradores.
+            </div>
+          )}
+
+          {showNovoAdminForm && isSuperAdmin && (
             <form onSubmit={handleCriarNovoAdmin} className="p-4 bg-neutral-50 border border-gray-200 rounded-2xl space-y-3 animate-fadeIn">
               <h4 className="text-xs font-black text-gray-900">Cadastrar Novo Administrador com Nome Completo</h4>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -1968,6 +2192,12 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
                         >
                           Nível {c.nivel_verificacao}
                         </span>
+                        {c.role === 'super_admin' && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500 text-zinc-950 flex items-center space-x-1">
+                            <Crown className="w-2.5 h-2.5" />
+                            <span>Super Admin</span>
+                          </span>
+                        )}
                         {c.role === 'admin' && (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-900 text-white">
                             Admin
@@ -2000,33 +2230,35 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
                         </Button>
                       )}
 
-                      {c.role !== 'admin' ? (
-                        <Button
-                          variant="outline"
-                          isLoading={atualizandoUserId === c.id}
-                          onClick={() => {
-                            if (confirm(`Deseja conceder acesso de Administrador para ${c.nome_completo}?`)) {
-                              void handleAlterarCidadao(c.id, { role: 'admin' });
-                            }
-                          }}
-                          className="py-1.5 px-3 rounded-xl text-xs font-semibold"
-                        >
-                          Tornar Admin
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          disabled={isSelf}
-                          isLoading={atualizandoUserId === c.id}
-                          onClick={() => {
-                            if (confirm(`Remover acesso de Administrador de ${c.nome_completo}?`)) {
-                              void handleAlterarCidadao(c.id, { role: 'cidadao' });
-                            }
-                          }}
-                          className="py-1.5 px-3 rounded-xl text-xs font-semibold disabled:opacity-40"
-                        >
-                          {isSelf ? 'Você (Admin)' : 'Remover Admin'}
-                        </Button>
+                      {isSuperAdmin && c.role !== 'super_admin' && (
+                        c.role !== 'admin' ? (
+                          <Button
+                            variant="outline"
+                            isLoading={atualizandoUserId === c.id}
+                            onClick={() => {
+                              if (confirm(`Deseja conceder acesso de Administrador para ${c.nome_completo}?`)) {
+                                void handleAlterarCidadao(c.id, { role: 'admin' });
+                              }
+                            }}
+                            className="py-1.5 px-3 rounded-xl text-xs font-semibold"
+                          >
+                            Tornar Admin
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            disabled={isSelf}
+                            isLoading={atualizandoUserId === c.id}
+                            onClick={() => {
+                              if (confirm(`Remover acesso de Administrador de ${c.nome_completo}?`)) {
+                                void handleAlterarCidadao(c.id, { role: 'cidadao' });
+                              }
+                            }}
+                            className="py-1.5 px-3 rounded-xl text-xs font-semibold disabled:opacity-40"
+                          >
+                            {isSelf ? 'Você (Admin)' : 'Remover Admin'}
+                          </Button>
+                        )
                       )}
                     </div>
                   </div>
@@ -2038,7 +2270,222 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
       )}
 
       {/* ======================================================== */}
-      {/* ABA 6: CONFIGURAÇÕES DE IA NO SERVIDOR & PROMPTS         */}
+      {/* ABA 6: CIDADES & QUÓRUM POR MUNICÍPIO                    */}
+      {/* ======================================================== */}
+      {activeTab === 'cidades' && (
+        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-gray-100">
+            <div>
+              <div className="flex items-center space-x-2">
+                <Scale className="w-5 h-5 text-crimson-600" />
+                <h3 className="text-sm font-black text-gray-900">
+                  Governança de Cidades, Meta de Desbloqueio &amp; Quórum de Petições
+                </h3>
+              </div>
+              <p className="text-xs text-gray-500 mt-1 max-w-2xl leading-relaxed">
+                <strong>Base Legal (Art. 5º, XXXIV, &ldquo;a&rdquo; CF/88):</strong> O Direito de Petição não possui mínimo fixo em lei federal (ao contrário de Projetos de Lei de Iniciativa Popular do Art. 29, XIII que exigem 5% do eleitorado). Defina aqui o quórum operacional de cada município.
+              </p>
+            </div>
+            <button
+              onClick={carregarCidadesConfig}
+              disabled={loadingCidades}
+              className="text-xs font-bold text-gray-700 hover:text-crimson-700 bg-white border border-gray-200 px-3 py-1.5 rounded-xl flex items-center space-x-1.5 self-start sm:self-auto"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loadingCidades ? 'animate-spin' : ''}`} />
+              <span>Atualizar</span>
+            </button>
+          </div>
+
+          {!isSuperAdmin && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900">
+              Visualização somente leitura. Apenas o <strong>Super Admin</strong> pode alterar quóruns ou ativar novas cidades.
+            </div>
+          )}
+
+          {cidadeNotice && (
+            <div className="p-3 bg-crimson-50 border border-crimson-200 rounded-xl text-xs font-bold text-crimson-900">
+              {cidadeNotice}
+            </div>
+          )}
+
+          {isSuperAdmin && (
+            <form onSubmit={handleAdicionarCidade} className="p-4 bg-neutral-50 border border-gray-200 rounded-2xl space-y-3">
+              <h4 className="text-xs font-black text-gray-900">Adicionar / Configurar Novo Município</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-5 gap-2.5">
+                <input
+                  type="text"
+                  required
+                  placeholder="Cidade (ex.: Jacareí)"
+                  value={novaCidadeNome}
+                  onChange={(e) => setNovaCidadeNome(e.target.value)}
+                  className="sm:col-span-2 p-2 bg-white border border-gray-200 rounded-xl text-xs text-gray-900"
+                />
+                <input
+                  type="text"
+                  required
+                  maxLength={2}
+                  placeholder="UF"
+                  value={novaCidadeUF}
+                  onChange={(e) => setNovaCidadeUF(e.target.value.toUpperCase())}
+                  className="p-2 bg-white border border-gray-200 rounded-xl text-xs text-gray-900 uppercase"
+                />
+                <input
+                  type="number"
+                  min={1}
+                  required
+                  placeholder="Quórum votos"
+                  title="Quórum de discordâncias para virar petição"
+                  value={novaCidadeQuorum}
+                  onChange={(e) => setNovaCidadeQuorum(e.target.value)}
+                  className="p-2 bg-white border border-gray-200 rounded-xl text-xs text-gray-900"
+                />
+                <input
+                  type="number"
+                  min={1}
+                  required
+                  placeholder="Meta cadastro"
+                  title="Meta de moradores para liberar cidade"
+                  value={novaCidadeMeta}
+                  onChange={(e) => setNovaCidadeMeta(e.target.value)}
+                  className="p-2 bg-white border border-gray-200 rounded-xl text-xs text-gray-900"
+                />
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2.5">
+                <input
+                  type="email"
+                  placeholder="E-mail padrão da Câmara / Gabinete (opcional)"
+                  value={novaCidadeEmailCamara}
+                  onChange={(e) => setNovaCidadeEmailCamara(e.target.value)}
+                  className="flex-1 p-2 bg-white border border-gray-200 rounded-xl text-xs text-gray-900"
+                />
+                <Button
+                  type="submit"
+                  variant="primary"
+                  className="py-2 px-4 rounded-xl text-xs font-bold bg-crimson-600 hover:bg-crimson-700 text-white"
+                >
+                  Salvar Município Ativo
+                </Button>
+              </div>
+            </form>
+          )}
+
+          {loadingCidades && cidadesList.length === 0 ? (
+            <div className="py-10 text-center text-xs text-gray-400">Carregando municípios...</div>
+          ) : (
+            <div className="space-y-3">
+              {cidadesList.map((cidade) => (
+                <div
+                  key={cidade.id}
+                  className="p-4 border border-gray-200 rounded-2xl bg-neutral-50/40 space-y-3"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm font-black text-gray-900">
+                        {cidade.nome} — {cidade.estado}
+                      </span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white border border-gray-200 text-gray-600">
+                        {cidade.total_cadastrados ?? 0} moradores cadastrados
+                      </span>
+                    </div>
+
+                    <select
+                      disabled={!isSuperAdmin}
+                      value={cidade.status}
+                      onChange={(e) => {
+                        const val = e.target.value as CidadeConfig['status'];
+                        setCidadesList((prev) =>
+                          prev.map((c) => (c.id === cidade.id ? { ...c, status: val } : c))
+                        );
+                      }}
+                      className="p-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-800 disabled:opacity-60"
+                    >
+                      <option value="ativa">Ativa</option>
+                      <option value="em_espera">Lista de Espera</option>
+                      <option value="em_breve">Em Breve</option>
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-500 uppercase block mb-1">
+                        Quórum de Petição (votos)
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        disabled={!isSuperAdmin}
+                        value={cidade.quorum_peticao ?? 50}
+                        onChange={(e) => {
+                          const val = Math.max(1, Number(e.target.value) || 1);
+                          setCidadesList((prev) =>
+                            prev.map((c) => (c.id === cidade.id ? { ...c, quorum_peticao: val } : c))
+                          );
+                        }}
+                        className="w-full p-2 bg-white border border-gray-200 rounded-xl font-bold text-crimson-700 disabled:opacity-60"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-500 uppercase block mb-1">
+                        Meta Liberação (moradores)
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        disabled={!isSuperAdmin}
+                        value={cidade.meta_usuarios ?? 500}
+                        onChange={(e) => {
+                          const val = Math.max(1, Number(e.target.value) || 1);
+                          setCidadesList((prev) =>
+                            prev.map((c) => (c.id === cidade.id ? { ...c, meta_usuarios: val } : c))
+                          );
+                        }}
+                        className="w-full p-2 bg-white border border-gray-200 rounded-xl font-bold text-gray-800 disabled:opacity-60"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-500 uppercase block mb-1">
+                        E-mail Padrão da Câmara
+                      </label>
+                      <input
+                        type="email"
+                        disabled={!isSuperAdmin}
+                        value={cidade.email_camara_padrao || ''}
+                        placeholder="camara@cidade.sp.gov.br"
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setCidadesList((prev) =>
+                            prev.map((c) => (c.id === cidade.id ? { ...c, email_camara_padrao: val } : c))
+                          );
+                        }}
+                        className="w-full p-2 bg-white border border-gray-200 rounded-xl font-mono text-[11px] text-gray-800 disabled:opacity-60"
+                      />
+                    </div>
+
+                    <div className="flex items-end">
+                      {isSuperAdmin && (
+                        <Button
+                          type="button"
+                          variant="primary"
+                          isLoading={salvandoCidadeId === cidade.id}
+                          onClick={() => void handleSalvarCidade(cidade)}
+                          className="w-full py-2 px-3 rounded-xl text-xs font-bold bg-zinc-900 hover:bg-zinc-800 text-white"
+                        >
+                          Salvar Município
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* ABA 7: CONFIGURAÇÕES DE IA NO SERVIDOR & PROMPTS         */}
       {/* ======================================================== */}
       {activeTab === 'config' && (
         <form onSubmit={handleSaveConfig} className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-5">
@@ -2064,7 +2511,7 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
           )}
 
           {/* Status das Variáveis no Servidor */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
             <div className="p-3 rounded-xl border border-gray-200 bg-gray-50 flex items-center justify-between gap-2">
               <div className="flex items-center space-x-2 min-w-0">
                 <Key className="w-4 h-4 text-crimson-600 shrink-0" />
@@ -2110,6 +2557,22 @@ Ementa: Regulamenta os horários, pontos de parada e diretrizes sanitárias para
                 }`}
               >
                 {serverConfig.serviceRoleConfigured ? 'Configurada' : 'Ausente'}
+              </span>
+            </div>
+
+            <div className="p-3 rounded-xl border border-gray-200 bg-gray-50 flex items-center justify-between gap-2">
+              <div className="flex items-center space-x-2 min-w-0">
+                <Mail className="w-4 h-4 text-crimson-600 shrink-0" />
+                <span className="font-bold text-gray-800 truncate">RESEND_API_KEY</span>
+              </div>
+              <span
+                className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
+                  serverConfig.resendConfigured
+                    ? 'bg-crimson-100 text-crimson-800'
+                    : 'bg-amber-100 text-amber-900'
+                }`}
+              >
+                {serverConfig.resendConfigured ? 'Configurada' : 'Modo Simulado'}
               </span>
             </div>
           </div>
